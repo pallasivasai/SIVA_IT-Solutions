@@ -253,6 +253,7 @@ elif page == "AI Project Room":
             current_project = project.strip() or "Unnamed project"
             st.session_state.selected_project = current_project
             outputs: dict[str, Any] = {}
+            generated_files: dict[str, str] = {}
             progress = st.status("Starting task workflow…", expanded=True)
             # Queue every specialist up front so a failed hand-off never leaves
             # downstream stations misleadingly showing IDLE.
