@@ -293,7 +293,11 @@ elif page == "AI Project Room":
                                     summary="; ".join(release_gate["reasons"]))
                     progress.warning("Release gate blocked the product. Seller and GitHub PR actions remain disabled until blockers are fixed.")
                 st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
-                progress.update(label="Workflow completed", state="complete", expanded=False)
+                progress.update(
+                    label="Workflow completed" if release_gate["passed"] else "Workflow blocked by release gate",
+                    state="complete" if release_gate["passed"] else "error",
+                    expanded=not release_gate["passed"],
+                )
             except ProviderError as exc:
                 store.add_event(run_id, "System", task, "workflow_failed", "failed", summary=str(exc))
                 progress.update(label="Workflow stopped", state="error", expanded=True)
@@ -306,6 +310,12 @@ elif page == "AI Project Room":
     if result:
         st.markdown(f"### Latest run · {result['project']}")
         st.caption(f"Run ID: {result['run_id']}")
+        if result.get("outputs", {}).get("market_gate"):
+            with st.expander("🔎 Research gate evidence", expanded=False):
+                st.json(result["outputs"]["market_gate"])
+        if result.get("outputs", {}).get("release_gate"):
+            with st.expander("🚦 Final release gate", expanded=True):
+                st.json(result["outputs"]["release_gate"])
         for label, key in [("🧭 Atlas dispatch plan","dispatch_plan"),("🗂️ Task assignments","assignment"),("🔎 Industry gap research","research"),("💡 Product strategy","product_strategy"),("💻 Implementation proposal","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security"),("📈 Sales and go-to-market plan","sales")]:
             with st.expander(label, expanded=(key == "plan")):
                 st.markdown(result["outputs"].get(key, "No report available."))
