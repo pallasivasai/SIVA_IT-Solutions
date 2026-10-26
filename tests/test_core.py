@@ -44,3 +44,32 @@ def test_persistent_task_queue_retries_then_fails(tmp_path):
     assert second and second["attempts"] == 2
     assert queue.fail(task_id, "worker-b", "still failing", retry_delay_seconds=0) == "failed"
     assert queue.get(task_id)["status"] == "failed"
+
+
+
+def test_orchestration_registry_has_25_distinct_roles():
+    from orchestration import AGENT_ROLES, WORKFLOW_STAGES
+
+    assert len(AGENT_ROLES) == 25
+    assert len({role["name"] for role in AGENT_ROLES}) == 25
+    assert len({stage["id"] for stage in WORKFLOW_STAGES}) == len(WORKFLOW_STAGES)
+
+
+def test_workflow_ledger_persists_messages_and_dependency_handoffs(tmp_path):
+    from orchestration import WorkflowLedger
+
+    ledger = WorkflowLedger(str(tmp_path / "workflow.db"))
+    run_id = ledger.create_run("Example", "Build an example product", "run-test-1")
+    board = ledger.task_board(run_id)
+    assert next(item for item in board if item["stage_id"] == "market_gap")["status"] == "ready"
+    assert next(item for item in board if item["stage_id"] == "competitors")["status"] == "blocked"
+
+    ledger.send_message(run_id, "market_gap", "Market Gap Research", "Competitor Analysis",
+                        {"evidence": ["https://example.com"], "gap": "sample unmet need"})
+    inbox = ledger.inbox(run_id, "Competitor Analysis")
+    assert inbox[0]["payload"]["gap"] == "sample unmet need"
+
+    ledger.complete_stage(run_id, "market_gap", {"gap": "sample unmet need"})
+    board = ledger.task_board(run_id)
+    assert next(item for item in board if item["stage_id"] == "competitors")["status"] == "ready"
+    assert ledger.audit_log(run_id)
