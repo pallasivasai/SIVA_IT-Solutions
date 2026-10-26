@@ -13,10 +13,15 @@ def test_validates_and_prefixes_project_paths():
     assert files == {"generated-project/src/app.py": "print('ok')"}
 
 
-@pytest.mark.parametrize("path", ["../escape.py", "/absolute.py", ".env", "src/.secret.py", "run.sh", "Dockerfile"])
+@pytest.mark.parametrize("path", ["../escape.py", "/absolute.py", ".env", "src/.secret.py", "run.sh"])
 def test_rejects_unsafe_paths_and_extensions(path):
     with pytest.raises(CodeBuildError):
         validate_file_bundle({"files": [{"path": path, "content": "no"}]})
+
+
+def test_allows_safe_dockerfile_for_generated_product():
+    files = validate_file_bundle({"files": [{"path": "Dockerfile", "content": "FROM python:3.12-slim"}]})
+    assert files["generated-project/Dockerfile"] == "FROM python:3.12-slim"
 
 
 def test_rejects_empty_or_oversized_manifest():
