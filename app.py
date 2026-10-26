@@ -245,9 +245,7 @@ elif page == "AI Project Room":
                     progress.write("💡 Nova · Project Manager — reviewing Scout's evidence and creating the product plan/task breakdown…")
                     strategy = run_agent_step(
                         router, store, run_id, team[1], current_project,
-                        "PROJECT MANAGER HAND-OFF: review Scout's full research report and public source evidence. "
-                        "Choose the strongest evidence-backed gap, create the MVP plan, acceptance criteria, dependencies, "
-                        "and a concrete Dev/Tara/Shield/GitHub/Sales task breakdown. Do not code.\n\n" + task,
+                        task,
                         outputs,
                     )
                     outputs["product_strategy"] = strategy["output"]
