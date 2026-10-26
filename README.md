@@ -3,7 +3,7 @@
 A Streamlit dashboard for a role-based AI engineering workflow. It displays agent-role cards, task events, provider selection, QA/security hand-offs and GitHub PR review links.
 
 ## Included features
-- **Virtual Office Floor:** a pixel-art office layout with seven agent workstations, role labels and status badges driven by recorded workflow events; includes a workflow lane and recent activity log.
+- **Virtual Office Floor:** a pixel-art office layout with eight agent workstations, role labels and status badges driven by recorded workflow events; includes a workflow lane and recent activity log.
 - **Task Board:** timestamped activity events and run filtering.
 - **AI Project Room:** Atlas dispatch plan → Mira task coordination → public web evidence collection → industry-gap research → product strategy → source generation → QA/security reviews → sales plan → human-reviewed GitHub PR.
 - **OpenAI primary + Gemini fallback:** fallback for likely quota/rate-limit/transient failures when Gemini is configured.
@@ -46,11 +46,16 @@ OpenAI is tried first. Gemini Flash-Lite (`gemini-3.5-flash-lite`) is the defaul
 ## Human approval boundary
 This app creates reviewable proposals and pull requests only. It does **not** execute model-generated code, merge pull requests or deploy to production. Configure branch protection on `main` and require PR review and passing checks where available.
 
-## Enable the unattended product-discovery schedule\n1. Open repository Settings → Secrets and variables → Actions.\n2. Add repository secrets `OPENAI_API_KEY` and optionally `GEMINI_API_KEY` (provider fallback). Do not put keys in the repo or Streamlit Secrets expecting GitHub Actions to see them; they are separate stores.\n3. Under Actions, enable workflows if GitHub asks, then open **24x7 Product Discovery Autopilot** and choose **Run workflow** to test it. A scheduled run is configured daily at 03:17 UTC.\n4. Optional repository variables: `OPENAI_MODEL`, `GEMINI_MODEL`, `AUTOPILOT_MARKET_NICHE`.\n5. The workflow uses the repository's `GITHUB_TOKEN` for branch/PR creation; its workflow permissions are limited to contents and pull requests. It creates a draft-free review PR but never merges, executes generated code or deploys.\n\n## Honest limitations
+## Enable the unattended product-discovery schedule\n1. Open repository Settings → Secrets and variables → Actions.\n2. Add repository secrets `OPENAI_API_KEY` and optionally `GEMINI_API_KEY` (provider fallback). Do not put keys in the repo or Streamlit Secrets expecting GitHub Actions to see them; they are separate stores.\n3. Under Actions, enable workflows if GitHub asks, then open **24x7 Product Discovery Autopilot** and choose **Run workflow** to test it. A scheduled run is configured daily at 03:17 UTC.\n4. Optional repository variables: `OPENAI_MODEL`, `GEMINI_MODEL`, `AUTOPILOT_MARKET_NICHE`.\n5. The workflow uses the repository's `GITHUB_TOKEN` for branch/PR creation; its workflow permissions are limited to contents and pull requests. It creates a draft-free review PR but never merges, executes generated code or deploys.\n\n## Queue, retries and honest runtime boundaries
+- Agent steps retry transient provider errors up to three attempts and record retry events; invalid credentials and other non-transient errors fail without repeated calls.
+- The office view filters statuses to the newest workflow run so old `DONE` events do not look like current work. Refreshing the page is visual refresh only; it does not start workers.
+- The current Streamlit task flow runs when a user submits a task, and the GitHub Actions product-discovery job is scheduled, not an always-on 24/7 daemon. A truly durable cross-process queue requires a shared persistent database and a continuously hosted worker; local SQLite alone is not durable on Streamlit Cloud restarts. Do not describe this setup as fully autonomous until that shared storage and worker are configured and tested.
+
+## Honest limitations
 - The scheduled worker is unattended between runs, not a continuously running daemon: the market-to-product workflow runs once daily by default and can be triggered manually. Each run can consume paid model API quota; monitor provider billing and disable the workflow if needed.
 - The shared-password gate is a basic safety barrier, not enterprise authentication or user-specific authorization.
 - The dashboard visualizes task/event status and concise operational summaries, not hidden chain-of-thought.
-- Generated source is constrained to a small allowlist of text file types and size limits, and is never executed by the Streamlit server. It is committed under `generated-project/` for review; CI currently tests this dashboard's own Python utilities, not every generated product's runtime behavior.
+- Generated source is constrained to a small allowlist of text file types and size limits, and is never executed by the Streamlit server. Product files are packaged under `products/<product-slug>/`; every PR must be reviewed and its product-specific README followed. CI tests this dashboard's own Python utilities, not every generated product's runtime behavior.
 - Streamlit local SQLite history may not persist across restarts/redeployments. Use managed persistent storage if durable history is needed.
 
 ## Structure
