@@ -165,6 +165,6 @@ def test_collect_market_research_uses_real_public_search_results(monkeypatch):
 def test_market_gate_counts_actual_source_urls():
     from pipeline_gates import evaluate_market_gate
 
-    result = evaluate_market_gate("\\n".join(["https://example.com/a", "https://example.org/b"]))
+    result = evaluate_market_gate("\n".join(["https://example.com/a", "https://example.org/b"]))
     assert result["passed"]
     assert result["source_count"] == 2
