@@ -136,3 +136,35 @@ def test_agents_have_fixed_specialist_scopes_and_explicit_handoffs():
     assert "Your fixed specialist scope" in system
     assert "HAND-OFF FROM Nova" in user
     assert "MVP scope" in user
+
+
+
+def test_collect_market_research_uses_real_public_search_results(monkeypatch):
+    import market_research
+
+    calls = []
+
+    def fake_search(query, limit=5):
+        calls.append(query)
+        if "competitors" in query:
+            return [{"title": "Competitor review", "url": "https://example.org/competitors", "snippet": "Users report complex setup."}]
+        return [{"title": "Customer discussion", "url": "https://example.com/pain", "snippet": "Small teams describe manual work."}]
+
+    monkeypatch.setattr(market_research, "search_market_evidence", fake_search)
+    pack = market_research.collect_market_research("Build a simple workflow product", limit=2)
+
+    assert len(calls) >= 2
+    assert any("complaints" in query for query in calls)
+    assert any("competitors" in query for query in calls)
+    assert len(pack["source_urls"]) == 2
+    assert "ResearchGate" in pack["context"]
+    assert "https://example.com/pain" in pack["context"]
+    assert "https://example.org/competitors" in pack["context"]
+
+
+def test_market_gate_counts_actual_source_urls():
+    from pipeline_gates import evaluate_market_gate
+
+    result = evaluate_market_gate("\\n".join(["https://example.com/a", "https://example.org/b"]))
+    assert result["passed"]
+    assert result["source_count"] == 2
