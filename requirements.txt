@@ -4,3 +4,4 @@ google-genai>=1.0,<2
 PyGithub>=2.5,<3
 pytest>=8,<9
 ddgs>=9,<10
+streamlit-autorefresh>=1.0.1,<2
