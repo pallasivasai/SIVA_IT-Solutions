@@ -315,11 +315,12 @@ elif page == "AI Project Room":
                                         summary="; ".join(release_gate["reasons"]))
                         progress.warning("Release gate blocked the product. Seller and GitHub PR actions remain disabled until blockers are fixed.")
                     st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
-                progress.update(
-                    label="Workflow completed" if release_gate["passed"] else "Workflow blocked by release gate",
-                    state="complete" if release_gate["passed"] else "error",
-                    expanded=not release_gate["passed"],
-                )
+                if market_gate["passed"]:
+                    progress.update(
+                        label="Workflow completed" if release_gate["passed"] else "Workflow blocked by release gate",
+                        state="complete" if release_gate["passed"] else "error",
+                        expanded=not release_gate["passed"],
+                    )
             except ProviderError as exc:
                 store.add_event(run_id, "System", task, "workflow_failed", "failed", summary=str(exc))
                 progress.update(label="Workflow stopped", state="error", expanded=True)
