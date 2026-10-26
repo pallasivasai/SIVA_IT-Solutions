@@ -21,10 +21,8 @@ try:
 except Exception:
     pass
 
-if not APP_PASSWORD or APP_PASSWORD == "change-this-to-a-long-random-password":
-    st.error("Access is locked: configure a strong APP_PASSWORD in Streamlit Secrets before using this public dashboard.")
-    st.stop()
-if not st.session_state.get("authenticated", False):
+PASSWORD_CONFIGURED = bool(APP_PASSWORD and APP_PASSWORD != "change-this-to-a-long-random-password")
+if PASSWORD_CONFIGURED and not st.session_state.get("authenticated", False):
     st.title("🔐 SIVA IT Solutions · Secure Office Login")
     entered = st.text_input("Office access password", type="password")
     if st.button("Unlock dashboard", type="primary"):
@@ -34,6 +32,9 @@ if not st.session_state.get("authenticated", False):
         else:
             st.error("Incorrect password.")
     st.stop()
+
+if not PASSWORD_CONFIGURED:
+    st.warning("Read-only mode: set a strong APP_PASSWORD in Streamlit Cloud → App settings → Secrets to enable AI task execution and GitHub PR actions.")
 st.markdown("""
 <style>
 .stApp { background: radial-gradient(circle at 14% 0%, #17314b 0%, #0b1422 44%, #070c14 100%); }
@@ -143,9 +144,11 @@ elif page == "AI Project Room":
         project = st.text_input("Project name", value=st.session_state.selected_project)
         task = st.text_area("Requirement", height=170, placeholder="Describe the feature, constraints, acceptance criteria and what must not change.")
         base_branch = st.text_input("Target base branch for PR (optional)", "main")
-        submitted = st.form_submit_button("Start workflow", type="primary")
+        submitted = st.form_submit_button("Start workflow", type="primary", disabled=not PASSWORD_CONFIGURED)
     if submitted:
-        if not task.strip():
+        if not PASSWORD_CONFIGURED:
+            st.warning("AI task execution is disabled until APP_PASSWORD is configured in Streamlit Secrets.")
+        elif not task.strip():
             st.error("Enter a task description first.")
         else:
             run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -184,7 +187,7 @@ elif page == "AI Project Room":
             with st.expander(label, expanded=(key == "plan")):
                 st.markdown(result["outputs"].get(key, "No report available."))
         st.warning("GitHub integration creates a review document from these outputs, not arbitrary executable code. Inspect before approval.")
-        if st.button("Create feature branch + GitHub Pull Request", type="primary", key=f"pr_{result['run_id']}"):
+        if st.button("Create feature branch + GitHub Pull Request", type="primary", key=f"pr_{result['run_id']}", disabled=not PASSWORD_CONFIGURED):
             try:
                 gh = GitHubService()
                 bundle = gh.generate_file_bundle(result)
