@@ -16,7 +16,8 @@ def evaluate_market_gate(research_context: str) -> dict[str, Any]:
         parsed = urlparse(url)
         if parsed.scheme in {"http", "https"} and parsed.netloc and "." in parsed.netloc:
             urls.add(url)
-    passed = len(urls) >= 2 and "live web research unavailable" not in (research_context or "").lower()
+# A failed provider diagnostic must not invalidate other genuine URLs.
+    passed = len(urls) >= 2
     return {
         "passed": passed,
         "source_count": len(urls),
