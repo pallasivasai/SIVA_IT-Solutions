@@ -146,7 +146,7 @@ elif page == "Task Board":
 
 elif page == "AI Project Room":
     st.subheader("🧩 Assign a task to the AI team")
-    st.write("Mira assigns tasks → Scout researches industry gaps → Nova designs a product to fill a gap → Dev builds source files → Tara checks quality → Shield reviews security → Seller prepares a sales plan. The files are packaged into a reviewable GitHub PR; generated code is never executed by this dashboard.")
+    st.write("Atlas dispatches tasks → Mira coordinates dependencies → Scout researches industry gaps → Nova designs a product to fill a gap → Dev builds source files → Tara checks quality → Shield reviews security → Seller prepares a sales plan. The files are packaged into a reviewable GitHub PR; generated code is never executed by this dashboard.")
     with st.form("task_form"):
         project = st.text_input("Project name", value=st.session_state.selected_project)
         task = st.text_area("Requirement", height=170, placeholder="Describe the feature, constraints, acceptance criteria and what must not change.")
@@ -164,18 +164,21 @@ elif page == "AI Project Room":
             outputs: dict[str, Any] = {}
             progress = st.status("Starting task workflow…", expanded=True)
             try:
-                assignment = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
+                dispatch = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
+                outputs["dispatch_plan"] = dispatch["output"]
+                progress.write("Atlas created the team dispatch plan")
+                assignment = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
                 outputs["assignment"] = assignment["output"]
-                progress.write("Mira assigned the work")
+                progress.write("Mira refined task ownership")
                 progress.write("Scout is collecting public market evidence…")
                 outputs["market_evidence"] = build_research_context(task)
                 scout = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
                 outputs["research"] = scout["output"]
                 progress.write("Scout completed gap research")
-                strategy = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
+                strategy = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
                 outputs["product_strategy"] = strategy["output"]
                 progress.write("Nova selected an MVP direction")
-                implementation = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
+                implementation = run_agent_step(router, store, run_id, team[4], current_project, task, outputs)
                 outputs["implementation"] = implementation["output"]
                 progress.write("Dev prepared implementation notes")
                 generated_files: dict[str, str] = {}
@@ -194,13 +197,13 @@ elif page == "AI Project Room":
                     outputs["code_build_error"] = str(exc)
                     store.add_event(run_id, "Dev · Code Builder", task, "code_generation_failed", "failed", summary=str(exc))
                     progress.write(f"Code generation needs retry: {exc}")
-                qa = run_agent_step(router, store, run_id, team[4], current_project, task, outputs)
+                qa = run_agent_step(router, store, run_id, team[5], current_project, task, outputs)
                 outputs["qa"] = qa["output"]
                 progress.write("Tara completed the QA report")
-                security = run_agent_step(router, store, run_id, team[5], current_project, task, outputs)
+                security = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
                 outputs["security"] = security["output"]
                 progress.write("Shield completed the security review")
-                sales = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
+                sales = run_agent_step(router, store, run_id, team[7], current_project, task, outputs)
                 outputs["sales"] = sales["output"]
                 progress.write("Seller prepared go-to-market assets")
                 st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
@@ -217,7 +220,7 @@ elif page == "AI Project Room":
     if result:
         st.markdown(f"### Latest run · {result['project']}")
         st.caption(f"Run ID: {result['run_id']}")
-        for label, key in [("🗂️ Task assignments","assignment"),("🔎 Industry gap research","research"),("💡 Product strategy","product_strategy"),("💻 Implementation proposal","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security"),("📈 Sales and go-to-market plan","sales")]:
+        for label, key in [("🧭 Atlas dispatch plan","dispatch_plan"),("🗂️ Task assignments","assignment"),("🔎 Industry gap research","research"),("💡 Product strategy","product_strategy"),("💻 Implementation proposal","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security"),("📈 Sales and go-to-market plan","sales")]:
             with st.expander(label, expanded=(key == "plan")):
                 st.markdown(result["outputs"].get(key, "No report available."))
         if result.get("code_build_error"):
