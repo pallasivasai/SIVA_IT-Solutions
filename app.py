@@ -11,7 +11,7 @@ from code_builder import CodeBuildError, build_project_files
 from ai_providers import ProviderError, ProviderRouter
 from github_service import GitHubError, GitHubService
 from project_checks import inspect_generated_files
-from market_research import build_research_context
+from market_research import build_research_context, collect_market_research
 from pipeline_gates import evaluate_market_gate, evaluate_release_gate
 from storage import EventStore
 
@@ -79,7 +79,7 @@ with st.sidebar:
     page = st.radio("Workspace", ["Office Floor", "Task Board", "AI Project Room", "GitHub Pull Requests", "Settings & Setup"])
     st.divider()
     st.markdown("**Agent hand-offs**")
-    st.write("🔎 Research → 💡 Product plan")
+    st.write("🔎 Scout research → 💡 Nova Project Manager plan")
     st.write("💻 Dev → 🧪 QA → 🛡️ Security")
     st.write("🛡️ Security → 🔀 GitHub Release Agent")
     st.write("🧭 Leads → 📈 Seller follow-up")
@@ -168,7 +168,7 @@ elif page == "Task Board":
 
 elif page == "AI Project Room":
     st.subheader("🧩 Give the company a product goal")
-    st.write("Give one product goal. The workflow engine automatically routes it through fixed-scope agents: Scout researches the industry gap → Nova defines the product → Dev builds it → Tara tests it → Shield reviews security → Dev fixes findings → QA/Security re-review → Lead Research finds sourced prospects → Seller prepares tailored outreach and follow-up. You do not assign individual tasks to agents. Sending outreach requires your approval and an authorized channel.")
+    st.write("Give one product goal. Scout searches the normal public web (not ResearchGate-specific), collects source URLs, and uses the configured AI model to identify customer pain, competitors and gaps. Nova acts as Project Manager: reviews Scout's entire evidence pack, writes the product plan and splits work into specialist hand-offs. Then Dev builds, Tara tests, Shield reviews security, Dev fixes findings, QA/Security re-review, GitHub Integrator prepares a PR, Lead Research finds sourced buyers, and Seller drafts outreach. You do not assign agent tasks manually. Sending outreach requires your approval.")
     with st.form("task_form"):
         project = st.text_input("Project name", value=st.session_state.selected_project)
         task = st.text_area("Requirement", height=170, placeholder="Example: Find an underserved problem for small businesses in India, build a secure MVP, test it, then research suitable buyers and prepare follow-up messages.")
@@ -191,8 +191,12 @@ elif page == "AI Project Room":
                 store.add_event(run_id, "Scout", task, "agent_started", "running",
                                 summary="Scout is collecting public market evidence and competitor sources")
                 progress.write("🔎 Scout · Market Researcher — collecting public evidence and competitor sources…")
-                outputs["market_evidence"] = build_research_context(task)
-                market_gate = evaluate_market_gate(outputs["market_evidence"])
+                research_pack = collect_market_research(task)
+                outputs["market_evidence"] = research_pack["context"]
+                outputs["market_sources"] = research_pack["results"]
+                outputs["market_search_diagnostics"] = research_pack["diagnostics"]
+                # Gate against actual search-result URLs, not URLs parsed from formatted prose.
+                market_gate = evaluate_market_gate("\n".join(research_pack["source_urls"]))
                 outputs["market_gate"] = market_gate
                 store.add_event(run_id, "Research Gate", task, "market_gate_checked",
                                 "completed" if market_gate["passed"] else "failed",
@@ -220,9 +224,16 @@ elif page == "AI Project Room":
                     scout = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
                     outputs["research"] = scout["output"]
                     progress.write("Scout completed gap research")
-                    strategy = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
+                    progress.write("💡 Nova · Project Manager — reviewing Scout's evidence and creating the product plan/task breakdown…")
+                    strategy = run_agent_step(
+                        router, store, run_id, team[1], current_project,
+                        "PROJECT MANAGER HAND-OFF: review Scout's full research report and public source evidence. "
+                        "Choose the strongest evidence-backed gap, create the MVP plan, acceptance criteria, dependencies, "
+                        "and a concrete Dev/Tara/Shield/GitHub/Sales task breakdown. Do not code.\n\n" + task,
+                        outputs,
+                    )
                     outputs["product_strategy"] = strategy["output"]
-                    progress.write("Nova selected an MVP direction")
+                    progress.write("Nova completed the project plan and specialist task breakdown")
                     implementation = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
                     outputs["implementation"] = implementation["output"]
                     progress.write("Dev prepared implementation notes")
