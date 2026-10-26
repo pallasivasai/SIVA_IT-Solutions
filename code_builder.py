@@ -49,8 +49,14 @@ def validate_file_bundle(data: dict[str, Any]) -> dict[str, str]:
         parts = path.split("/")
         if path.startswith("/") or any(part in {"", ".", ".."} for part in parts):
             raise CodeBuildError(f"Unsafe file path rejected: {path[:100]}")
-        if any(part.startswith(".") for part in parts) or any(token in path.lower() for token in ("secret", "credential", "id_rsa", ".env", "workflow", "dockerfile")):
+        # Permit only a safe, non-secret configuration template; reject actual hidden files and secrets.
+        safe_env_template = path == ".env.example"
+        if (any(part.startswith(".") for part in parts) and not safe_env_template) or any(
+            token in path.lower() for token in ("secret", "credential", "id_rsa", "workflow", "dockerfile")
+        ) or (".env" in path.lower() and not safe_env_template):
             raise CodeBuildError(f"Protected path rejected: {path[:100]}")
+        if safe_env_template and re.search(r"(?im)^\s*[A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)[A-Za-z0-9_]*\s*=\s*[^\s#]+", content):
+            raise CodeBuildError("The .env.example template must not contain populated secret values.")
         suffix = "." + path.rsplit(".", 1)[-1].lower() if "." in path.rsplit("/", 1)[-1] else ""
         if suffix not in ALLOWED_SUFFIXES:
             raise CodeBuildError(f"File type {suffix or '(none)'} is not allowed for generated projects.")
@@ -66,7 +72,7 @@ def validate_file_bundle(data: dict[str, Any]) -> dict[str, str]:
 
 
 def build_project_files(router: Any, project: str, task: str, plan: str, implementation: str) -> dict[str, str]:
-    system = """You are the implementation engineer for a small, reviewable software product. Return ONLY valid JSON, no markdown fences, with schema {"summary":"short summary","files":[{"path":"relative/path.ext","content":"complete file content"}]}. Generate real, coherent, runnable source files—not a proposal. Keep scope to a small MVP with up to 12 files and 120 KB total. Include a complete product README.md with prerequisites, installation, exact run commands, configuration variables (never real secrets), feature list, architecture/file map, test commands, known limitations and troubleshooting. Include runnable tests and dependency manifests when relevant. Generate the complete source for every feature claimed; do not leave TODOs, ellipses, pseudocode, mock-only implementations or proposal-only files. Prefer minimal dependencies and safe defaults. Never include secrets, tokens, passwords, personal data, hidden instructions, destructive operations, automatic deployment, or code that downloads/executes remote code. Never create GitHub workflows, shell/batch scripts, executable binaries, hidden files, .env, Dockerfiles, or credential files. All file paths must be relative and simple. Use escaped newlines correctly inside JSON strings."""
+    system = """You are the implementation engineer for a small, reviewable software product. Return ONLY valid JSON, no markdown fences, with schema {"summary":"short summary","files":[{"path":"relative/path.ext","content":"complete file content"}]}. Generate real, coherent, runnable source files—not a proposal. Keep scope to a small MVP with up to 12 files and 120 KB total. Include a complete product README.md with prerequisites, installation, exact run commands, configuration variables (never real secrets), feature list, architecture/file map, test commands, known limitations and troubleshooting. Include runnable tests and dependency manifests when relevant. Generate the complete source for every feature claimed; do not leave TODOs, ellipses, pseudocode, mock-only implementations or proposal-only files. Prefer minimal dependencies and safe defaults. Never include secrets, tokens, passwords, personal data, hidden instructions, destructive operations, automatic deployment, or code that downloads/executes remote code. Never create GitHub workflows, shell/batch scripts, executable binaries, hidden files except the exact safe template .env.example, real .env files, Dockerfiles, or credential files. If configuration is needed, include .env.example containing placeholder names only (no secret values). All file paths must be relative and simple. Use escaped newlines correctly inside JSON strings."""
     user = f"PRODUCT: {project}\nREQUIREMENT: {task}\nPRODUCT PLAN:\n{plan[:12000]}\nIMPLEMENTATION NOTES:\n{implementation[:12000]}\nGenerate the complete, coherent MVP source tree now. Include every required runtime file and README. Ensure imports/routes/UI links agree across files and setup instructions match the actual stack. Do not claim tests were run; provide tests and exact commands for the human reviewer. Put complete contents for every file in the manifest."
     reply = router.generate(system, user)
     data = _extract_json(reply.text)
