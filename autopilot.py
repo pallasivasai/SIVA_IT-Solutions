@@ -53,6 +53,34 @@ def main() -> None:
     outputs["static_qa"] = "\n".join("- " + item["status"] + ": " + item["detail"] for item in checks["checks"])
     outputs["qa"] = run_agent_step(router, store, run_id, team[3], project, brief, outputs)["output"]
     outputs["security"] = run_agent_step(router, store, run_id, team[4], project, brief, outputs)["output"]
+
+    # Specialist hand-off loop: Dev owns remediation; QA and Security independently re-review.
+    remediation_task = (
+        "Fix concrete findings in the current generated product source. Preserve unrelated behaviour. "
+        "Use the source, acceptance criteria, static check results, QA findings and security findings below. "
+        "Do not claim tests were executed.\n\n"
+        "CURRENT FILES:\n" + outputs["generated_files_context"][:18000] +
+        "\n\nQA FINDINGS:\n" + outputs["qa"][:7000] +
+        "\n\nSECURITY FINDINGS:\n" + outputs["security"][:7000] +
+        "\n\nSTATIC CHECKS:\n" + outputs["static_qa"]
+    )
+    outputs["remediation"] = run_agent_step(router, store, run_id, team[2], project, remediation_task, outputs)["output"]
+    revised_brief = (
+        brief + "\n\nQA FINDINGS TO FIX:\n" + outputs["qa"] +
+        "\n\nSECURITY FINDINGS TO FIX:\n" + outputs["security"] +
+        "\n\nDEV REMEDIATION NOTES:\n" + outputs["remediation"]
+    )
+    files = build_project_files(router, project, revised_brief, outputs["product_strategy"], outputs["remediation"])
+    outputs["generated_files_summary"] = "\n".join(files)
+    outputs["generated_files_context"] = "\n\n".join("### " + path + "\n" + body[:4000] for path, body in list(files.items())[:8])[:20000]
+    checks = inspect_generated_files(files)
+    outputs["static_qa"] = "\n".join("- " + item["status"] + ": " + item["detail"] for item in checks["checks"])
+    outputs["qa"] = run_agent_step(router, store, run_id, team[3], project,
+                                    "INDEPENDENT RE-REVIEW after Dev remediation. Verify prior defects against the revised source. " + brief,
+                                    outputs)["output"]
+    outputs["security"] = run_agent_step(router, store, run_id, team[4], project,
+                                         "INDEPENDENT SECURITY RE-REVIEW after Dev remediation. Verify fixes and residual risks. " + brief,
+                                         outputs)["output"]
     release_gate = evaluate_release_gate(files, checks, outputs["qa"], outputs["security"])
     outputs["release_gate"] = release_gate
     store.add_event(run_id, "Final Release Auditor", brief, "release_gate_checked",
