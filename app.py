@@ -76,7 +76,7 @@ if "last_run" not in st.session_state:
 with st.sidebar:
     st.markdown("## 🏢 SIVA IT Solutions")
     st.caption("AI Company Control Center")
-    page = st.radio("Workspace", ["Office Floor", "Task Board", "AI Project Room", "GitHub Pull Requests", "Settings & Setup"])
+    page = st.radio("Workspace", ["Agent Workbench", "AI Project Room", "Task Board", "Office Floor", "GitHub Pull Requests", "Settings & Setup"])
     st.divider()
     st.markdown("**Agent hand-offs**")
     st.write("🔎 Scout research → 💡 Nova Project Manager plan")
@@ -92,7 +92,76 @@ st.markdown("""
  <p>Follow task ownership, workflow hand-offs, provider usage, QA/security reports and review-ready GitHub changes.</p>
 </div>""", unsafe_allow_html=True)
 
-if page == "Office Floor":
+if page == "Agent Workbench":
+    from streamlit_autorefresh import st_autorefresh
+    st_autorefresh(interval=4000, key="agent_workbench_refresh")
+    st.subheader("🧰 Agent Workbench")
+    st.write("Task-first view: every specialist has a defined job, a live status, the exact hand-off task, and the latest recorded result. This page shows recorded workflow activity; it does not fake background execution.")
+    work_events = store.recent_events(limit=500)
+    latest_run_id = str(work_events[0].get("run_id", "")) if work_events else ""
+    run_events = [ev for ev in work_events if str(ev.get("run_id", "")) == latest_run_id] if latest_run_id else []
+    latest_by_agent = {}
+    for ev in run_events:
+        raw_name = str(ev.get("agent_name", "")).strip()
+        name = "Dev" if raw_name.startswith("Dev ·") else ("GitHub Integrator" if raw_name == "GitHub Integrator" else raw_name)
+        if name and name not in latest_by_agent:
+            latest_by_agent[name] = ev
+    work_specs = [
+        ("Scout", "Market research", "Search public sources; identify customer pain, competitors and evidence-backed gaps."),
+        ("Nova", "Project manager", "Convert Scout's evidence into an MVP plan, acceptance criteria and task hand-offs."),
+        ("Dev", "Build product", "Generate the real source files, then fix concrete QA/security findings."),
+        ("Tara", "Quality assurance", "Check the generated files against acceptance criteria and report defects."),
+        ("Shield", "Security review", "Review actual generated source for vulnerabilities and verify fixes."),
+        ("GitHub Integrator", "Release preparation", "Create a reviewable feature-branch PR only after release gates pass."),
+        ("Lead Research", "Buyer research", "Find relevant buyers using verifiable public sources after product readiness."),
+        ("Seller", "Sales follow-up", "Prepare tailored outreach and follow-up from verified buyer leads; do not send automatically."),
+    ]
+    status_map = {"running": "WORKING", "completed": "DONE", "failed": "ERROR", "waiting": "WAITING", "blocked": "BLOCKED", "waiting_approval": "NEEDS APPROVAL"}
+    for start in range(0, len(work_specs), 2):
+        cols = st.columns(2)
+        for col, spec in zip(cols, work_specs[start:start+2]):
+            name, role, objective = spec
+            ev = latest_by_agent.get(name, {})
+            status = status_map.get(str(ev.get("status", "idle")), "NOT STARTED")
+            with col:
+                with st.container(border=True):
+                    st.markdown(f"### {ev.get('agent_name', name)}")
+                    st.caption(role)
+                    st.markdown(f"**Status:** {status}")
+                    st.write("**Specialist task**")
+                    st.write(str(ev.get("task", objective))[:1400])
+                    if ev.get("summary"):
+                        st.info(str(ev["summary"])[:1000])
+                    if ev.get("provider") or ev.get("model"):
+                        st.caption(f"Provider: {ev.get('provider', 'configured')} · Model: {ev.get('model', 'configured default')}")
+    if latest_run_id:
+        st.caption(f"Latest workflow run: {latest_run_id}")
+        with st.expander("Inspect latest run's product plan, source files and review reports", expanded=True):
+            last_run = st.session_state.get("last_run")
+            if last_run and str(last_run.get("run_id")) == latest_run_id:
+                outputs = last_run.get("outputs", {})
+                for key, title in [("research", "Scout research"), ("product_strategy", "Nova product plan"), ("implementation", "Dev implementation"), ("generated_files_summary", "Generated product files"), ("static_qa", "Static checks"), ("qa", "Tara QA report"), ("security", "Shield security report"), ("code_build_error", "Build blocker"), ("release_gate", "Release gate")]:
+                    if outputs.get(key):
+                        st.markdown(f"**{title}**")
+                        if isinstance(outputs[key], (dict, list)):
+                            st.json(outputs[key])
+                        else:
+                            st.code(str(outputs[key])[:10000] if key == "code_build_error" else str(outputs[key])[:6000])
+                if last_run.get("files"):
+                    st.markdown("**Generated file preview**")
+                    for path, body in last_run["files"].items():
+                        with st.expander(path):
+                            st.code(body[:12000])
+            else:
+                for ev in run_events[:40]:
+                    st.markdown(f"**{ev.get('agent_name', 'System')}** · {str(ev.get('status', 'unknown')).upper()}")
+                    st.caption(str(ev.get("task", ""))[:400])
+                    if ev.get("summary"):
+                        st.write(str(ev["summary"])[:700])
+    else:
+        st.info("No workflow yet. Open AI Project Room and submit one product goal. The workbench will show each specialist's exact task as it runs.")
+
+elif page == "Office Floor":
     from streamlit_autorefresh import st_autorefresh
     st_autorefresh(interval=5000, key="office_live_refresh")
 
@@ -288,12 +357,25 @@ elif page == "AI Project Room":
                         store.add_event(run_id, "Dev", task, "code_generation_failed", "failed",
                                         summary=outputs["code_build_error"])
                         progress.error("Dev could not generate the product source files: " + outputs["code_build_error"])
-                    qa = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
-                    outputs["qa"] = qa["output"]
-                    progress.write("Tara completed the QA report")
-                    security = run_agent_step(router, store, run_id, team[4], current_project, task, outputs)
-                    outputs["security"] = security["output"]
-                    progress.write("Shield completed the security review")
+                    if generated_files:
+                        qa = run_agent_step(router, store, run_id, team[3], current_project,
+                                            "QA HAND-OFF: inspect the actual generated source files and Nova's acceptance criteria. "
+                                            "Run/assess the provided tests where possible, list concrete defects, and do not claim execution without evidence.\n\n" + task,
+                                            outputs)
+                        outputs["qa"] = qa["output"]
+                        progress.write("Tara completed the QA report on generated files")
+                        security = run_agent_step(router, store, run_id, team[4], current_project,
+                                                  "SECURITY HAND-OFF: inspect the actual generated source files, dependencies and QA findings. "
+                                                  "Report concrete vulnerabilities and remediation. Do not claim scans were executed unless they were.\n\n" + task,
+                                                  outputs)
+                        outputs["security"] = security["output"]
+                        progress.write("Shield completed the security review on generated files")
+                    else:
+                        outputs["qa"] = "RELEASE_GATE: FAIL\nQA not run because Dev did not generate product source files. Fix the build blocker and retry."
+                        outputs["security"] = "RELEASE_GATE: FAIL\nSecurity review not run because there are no generated source files to inspect."
+                        store.add_event(run_id, "Tara", task, "agent_failed", "failed", summary="QA skipped: Dev source generation failed")
+                        store.add_event(run_id, "Shield", task, "agent_failed", "failed", summary="Security review skipped: no source files to inspect")
+                        progress.error("QA and Security were correctly blocked because Dev did not generate source files.")
                     # One bounded feedback loop: Dev receives the actual QA/security findings,
                     # regenerates the source tree, and both reviewers inspect the revised files.
                     if generated_files:
