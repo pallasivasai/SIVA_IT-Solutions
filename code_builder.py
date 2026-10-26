@@ -84,20 +84,21 @@ def validate_file_bundle(data: dict[str, Any]) -> dict[str, str]:
         ) or (".env" in path.lower() and not safe_env_template):
             raise CodeBuildError(f"Protected path rejected: {path[:100]}")
         if safe_env_template:
-            # .env.example commonly uses human-readable placeholders. Reject values that
-            # look populated, but allow safe placeholders such as YOUR_API_KEY_HERE,
-            # replace_me, changeme, <your-token>, and empty values.
-            secret_assignment = re.compile(
-                r"(?im)^\\s*[A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)[A-Za-z0-9_]*\\s*=\\s*([^\\s#]*)"
+            # Allow ordinary placeholder values but reject populated credentials.
+            key_names = re.compile(r"(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.IGNORECASE)
+            known_placeholders = re.compile(
+                r"(?i)^(?:your(?:[_-][a-z0-9]+)*|replace[_-]?me|change[_-]?me|"
+                r"placeholder|example|dummy|insert[_-]?here|enter[_-]?here|todo|"
+                r"none|null|xxx+|<[^>]+>|\$\{[^}]+\}|\.\.\.)$"
             )
-            placeholder_value = re.compile(
-                r"(?i)^(?:|your(?:[-_][a-z0-9]+)*|replace(?:[-_]?me)?|change(?:[-_]?me)?|"
-                r"placeholder|example|dummy|insert(?:[-_]?here)?|enter(?:[-_]?here)?|todo|"
-                r"none|null|xxx+|<[^>]+>|\\$\\{[^}]+\\}|\\.\\.\\.)$"
-            )
-            for match in secret_assignment.finditer(content):
-                value = match.group(1).strip().strip('"\\'')
-                if value and not placeholder_value.fullmatch(value):
+            for line in content.splitlines():
+                if "=" not in line or line.lstrip().startswith("#"):
+                    continue
+                key, value = line.split("=", 1)
+                if not key_names.search(key):
+                    continue
+                value = value.strip().strip("\"'")
+                if value and not known_placeholders.fullmatch(value):
                     raise CodeBuildError(
                         "The .env.example template must not contain populated secret values."
                     )
