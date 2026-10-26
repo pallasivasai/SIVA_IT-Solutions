@@ -67,13 +67,18 @@ class GitHubService:
                 "\n\n## Research and customer gap\n\n" + str(outputs.get("research", "See the parent ai-workflow report.")) +
                 "\n\n## How to run\n\nRead README.md in this folder and follow its setup instructions. Review and test before production use.\n"
             )
+        if generated:
+            product_dir = "products/" + self._slug(project) + "/"
+            files[product_dir + "QA_REPORT.md"] = "# QA / Testing report\n\n## Static checks\n\n" + str(outputs.get("static_qa", "No static checks recorded.")) + "\n\n## QA agent assessment\n\n" + str(outputs.get("qa", "No QA report generated.")) + "\n\nGenerated code was not executed by the dashboard. Run the documented tests in a disposable environment before release.\n"
+            files[product_dir + "SECURITY_REVIEW.md"] = "# Security review\n\n" + str(outputs.get("security", "No security report generated.")) + "\n\nHuman reviewer must resolve or accept findings before merge.\n"
+            files[product_dir + "GO_TO_MARKET.md"] = "# Go-to-market and sales pack\n\n" + str(outputs.get("sales", "No sales report generated.")) + "\n\nDraft only: no prospects contacted and no sales messages sent. Validate assumptions before use.\n"
         if sum(len(body.encode("utf-8")) for body in files.values()) > 220_000:
             raise GitHubError("Combined PR bundle exceeds the 220 KB safety limit.")
         return files
 
     def create_change_request(self, project_name: str, task: str, files: dict[str, str], base_branch: str = "main") -> dict[str, Any]:
-        if not files or len(files) > 14:
-            raise GitHubError("Empty file bundle or more than 14 files; stopping for safety.")
+        if not files or len(files) > 18:
+            raise GitHubError("Empty file bundle or more than 18 files; stopping for safety.")
         if any(path.startswith("/") or ".." in path.split("/") for path in files):
             raise GitHubError("Unsafe file path rejected.")
         base = self.repository.get_branch(base_branch)
