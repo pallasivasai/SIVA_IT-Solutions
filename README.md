@@ -3,13 +3,13 @@
 A Streamlit dashboard for a role-based AI engineering workflow. It displays agent-role cards, task events, provider selection, QA/security hand-offs and GitHub PR review links.
 
 ## Included features
-- **Office Floor:** Product Manager, Software Engineer, QA Engineer and Security Reviewer cards.
+- **Office Floor:** Task Assignment Lead, Market Researcher, Product Strategist, Software Engineer, QA Engineer, Security Reviewer and Go-to-Market/Sales agent cards.
 - **Task Board:** timestamped activity events and run filtering.
-- **AI Project Room:** submit a requirement and have the Developer agent generate actual source files for a small MVP, preview them, and include them in a GitHub PR.
+- **AI Project Room:** task assignment → public web evidence collection → industry-gap research → product strategy → source generation → QA/security reviews → sales plan → human-reviewed GitHub PR.
 - **OpenAI primary + Gemini fallback:** fallback for likely quota/rate-limit/transient failures when Gemini is configured.
 - **GitHub review workflow:** create a dedicated feature branch and PR containing generated product source files plus role reports. No merge/deployment methods are implemented.
 - **Secret-safe settings:** environment variables or Streamlit Secrets; no API keys in source.
-- **Automated checks:** GitHub Actions runs unit tests for feature branches and PRs.
+- **Autonomous scheduled discovery:** GitHub Actions runs the market-to-product pipeline daily, even when Streamlit is closed, and opens a product PR for human review. You can also start it manually from Actions.\n- **Product-per-folder delivery:** every generated product is packaged under `products/<product-slug>/` with source files, README/run instructions and `PRODUCT_BRIEF.md`; the parent `ai-workflow/README.md` includes research evidence, product strategy, QA, security and sales plan.\n- **Automated checks:** GitHub Actions runs unit tests for feature branches and PRs.
 
 ## Run locally (Windows PowerShell)
 
@@ -18,7 +18,7 @@ Use Python 3.11 or 3.12 for package compatibility.
 ```powershell
 git clone https://github.com/pallasivasai/SIVA_IT-Solutions.git
 cd SIVA_IT-Solutions
-git checkout feat/ai-company-control-center
+git checkout main
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
@@ -34,7 +34,7 @@ streamlit run app.py
 
 ## Deploy to Streamlit Community Cloud
 1. Go to [Streamlit Community Cloud](https://share.streamlit.io/).
-2. Select `pallasivasai/SIVA_IT-Solutions`, branch `feat/ai-company-control-center`, and main file `app.py`.
+2. Select `pallasivasai/SIVA_IT-Solutions`, branch `main`, and main file `app.py`.
 3. In app Settings → Secrets, add the configuration keys with real values. Never put keys in source code or chat.
 4. Set a strong unique `APP_PASSWORD` in Streamlit Secrets; the app locks itself when it is missing or left at the placeholder value.
 5. GitHub PR integration needs a fine-grained token with only required Contents and Pull Requests permissions. Store it as `GITHUB_TOKEN`.
@@ -46,8 +46,8 @@ OpenAI is tried first. Gemini is used when OpenAI is not configured or a likely 
 ## Human approval boundary
 This app creates reviewable proposals and pull requests only. It does **not** execute model-generated code, merge pull requests or deploy to production. Configure branch protection on `main` and require PR review and passing checks where available.
 
-## Honest limitations
-- This is a user-triggered workflow, not an always-on workforce.
+## Enable the unattended product-discovery schedule\n1. Open repository Settings → Secrets and variables → Actions.\n2. Add repository secrets `OPENAI_API_KEY` and optionally `GEMINI_API_KEY` (provider fallback). Do not put keys in the repo or Streamlit Secrets expecting GitHub Actions to see them; they are separate stores.\n3. Under Actions, enable workflows if GitHub asks, then open **24x7 Product Discovery Autopilot** and choose **Run workflow** to test it. A scheduled run is configured daily at 03:17 UTC.\n4. Optional repository variables: `OPENAI_MODEL`, `GEMINI_MODEL`, `AUTOPILOT_MARKET_NICHE`.\n5. The workflow uses the repository's `GITHUB_TOKEN` for branch/PR creation; its workflow permissions are limited to contents and pull requests. It creates a draft-free review PR but never merges, executes generated code or deploys.\n\n## Honest limitations
+- The scheduled worker is unattended between runs, not a continuously running daemon: the market-to-product workflow runs once daily by default and can be triggered manually. Each run can consume paid model API quota; monitor provider billing and disable the workflow if needed.
 - The shared-password gate is a basic safety barrier, not enterprise authentication or user-specific authorization.
 - The dashboard visualizes task/event status and concise operational summaries, not hidden chain-of-thought.
 - Generated source is constrained to a small allowlist of text file types and size limits, and is never executed by the Streamlit server. It is committed under `generated-project/` for review; CI currently tests this dashboard's own Python utilities, not every generated product's runtime behavior.
