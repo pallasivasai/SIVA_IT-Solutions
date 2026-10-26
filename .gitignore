@@ -1,0 +1,16 @@
+# Secrets
+.env
+.env.*
+.streamlit/secrets.toml
+!.streamlit/secrets.toml.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local event database
+data/
+*.db
