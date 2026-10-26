@@ -110,3 +110,23 @@ def test_release_gate_blocks_static_failures():
     )
     assert not result["passed"]
     assert not result["static_checks_pass"]
+
+
+def test_agents_have_fixed_specialist_scopes_and_explicit_handoffs():
+    from agents import build_prompts
+
+    team = build_team()
+    by_name = {agent["name"]: agent for agent in team}
+    assert "industry gaps" in by_name["Scout"]["role"].lower()
+    assert "software engineer" in by_name["Dev"]["role"].lower()
+    assert "qa engineer" in by_name["Tara"]["role"].lower()
+    assert "security engineer" in by_name["Shield"]["role"].lower()
+    assert "sales intelligence" in by_name["Lead Research"]["role"].lower()
+    assert "follow-up" in by_name["Seller"]["role"].lower()
+    assert "Atlas" not in by_name
+    assert "Mira" not in by_name
+
+    system, user = build_prompts(by_name["Dev"], "Demo", "Build a product", {"Nova": "MVP scope"})
+    assert "Your fixed specialist scope" in system
+    assert "HAND-OFF FROM Nova" in user
+    assert "MVP scope" in user
