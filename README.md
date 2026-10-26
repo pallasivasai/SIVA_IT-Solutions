@@ -3,13 +3,18 @@
 A Streamlit dashboard for a role-based AI engineering workflow. It displays agent-role cards, task events, provider selection, QA/security hand-offs and GitHub PR review links.
 
 ## Included features
-- **Virtual Office Floor:** a pixel-art office layout with eight agent workstations, role labels and status badges driven by recorded workflow events; includes a workflow lane and recent activity log.
-- **Task Board:** timestamped activity events and run filtering.
-- **AI Project Room:** Atlas dispatch plan → Mira task coordination → public web evidence collection → industry-gap research → product strategy → source generation → QA/security reviews → sales plan → human-reviewed GitHub PR.
+- **Virtual Office Floor:** seven specialist workstations; status labels reflect recorded events, not fabricated background activity.
+- **Task Board:** timestamped workflow events and run filtering. The user submits a product goal, not agent-specific assignments.
+- **Automatic specialist hand-offs:** Scout researches the industry gap → Nova plans the MVP → Dev builds it → Tara writes/reviews tests → Shield reviews security → Dev remediates → QA/Security re-review → Lead Research finds sourced buyer prospects → Seller prepares tailored outreach and follow-up.
+- **Fixed role scopes:** there is no Atlas/Mira task-assignment agent. Workflow routing is deterministic application logic; each AI agent is responsible for its specialist deliverable and reads prior hand-offs.
+- **Lead evidence:** prospect research uses public search results and must include source URLs. Missing search results are a blocker, not permission to invent leads or contact details.
+- **Seller follow-up:** produces prospect-specific outreach drafts, follow-up cadence, objection responses and CRM-ready status fields. It does not send messages or make calls without explicit approval and an authorized connected channel.
 - **OpenAI primary + Gemini fallback:** fallback for likely quota/rate-limit/transient failures when Gemini is configured.
 - **GitHub review workflow:** create a dedicated feature branch and PR containing generated product source files plus role reports. No merge/deployment methods are implemented.
 - **Secret-safe settings:** environment variables or Streamlit Secrets; no API keys in source.
-- **Autonomous scheduled discovery:** GitHub Actions runs the market-to-product pipeline daily, even when Streamlit is closed, and opens a product PR for human review. You can also start it manually from Actions.\n- **Product-per-folder delivery:** every generated product is packaged under `products/<product-slug>/` with source files, README/run instructions and `PRODUCT_BRIEF.md`; the parent `ai-workflow/README.md` includes research evidence, product strategy, QA, security and sales plan.\n- **Automated checks:** GitHub Actions runs unit tests for feature branches and PRs.
+- **Scheduled discovery:** GitHub Actions can run the market-to-product pipeline daily when enabled and credentials are configured; this is scheduled execution, not a continuously running 24/7 worker.
+- **Product-per-folder delivery:** generated products are packaged under `products/<product-slug>/` with source files, README/run instructions and `PRODUCT_BRIEF.md`.
+- **Automated checks:** GitHub Actions runs unit tests for feature branches and PRs.
 
 ## Run locally (Windows PowerShell)
 
@@ -46,13 +51,13 @@ OpenAI is tried first. Gemini Flash-Lite (`gemini-3.5-flash-lite`) is the defaul
 ## Human approval boundary
 This app creates reviewable proposals and pull requests only. It does **not** execute model-generated code, merge pull requests or deploy to production. Configure branch protection on `main` and require PR review and passing checks where available.
 
-## Enable the unattended product-discovery schedule\n1. Open repository Settings → Secrets and variables → Actions.\n2. Add repository secrets `OPENAI_API_KEY` and optionally `GEMINI_API_KEY` (provider fallback). Do not put keys in the repo or Streamlit Secrets expecting GitHub Actions to see them; they are separate stores.\n3. Under Actions, enable workflows if GitHub asks, then open **24x7 Product Discovery Autopilot** and choose **Run workflow** to test it. A scheduled run is configured daily at 03:17 UTC.\n4. Optional repository variables: `OPENAI_MODEL`, `GEMINI_MODEL`, `AUTOPILOT_MARKET_NICHE`.\n5. The workflow uses the repository's `GITHUB_TOKEN` for branch/PR creation; its workflow permissions are limited to contents and pull requests. It creates a draft-free review PR but never merges, executes generated code or deploys.\n\n## Enforced product workflow gates
+## Enable the unattended product-discovery schedule\n1. Open repository Settings → Secrets and variables → Actions.\n2. Add repository secrets `OPENAI_API_KEY` and optionally `GEMINI_API_KEY` (provider fallback). Do not put keys in the repo or Streamlit Secrets expecting GitHub Actions to see them; they are separate stores.\n3. Under Actions, enable workflows if GitHub asks, then open **24x7 Product Discovery Autopilot** and choose **Run workflow** to test it. A scheduled run is configured daily at 03:17 UTC.\n4. Optional repository variables: `OPENAI_MODEL`, `GEMINI_MODEL`, `AUTOPILOT_MARKET_NICHE`.\n5. The workflow uses the repository's `GITHUB_TOKEN` for branch/PR creation; its workflow permissions are limited to contents and pull requests. It creates a draft-free review PR but never merges, executes generated code or deploys.\n\n## Enforced hand-off and release gates
 
-- **Research first:** live research must return at least two distinct public source URLs before the Scout-to-product-planning hand-off is allowed. If sources are unavailable, the run stops rather than inventing industry gaps.
-- **Build after planning:** the product strategy and implementation hand-offs precede source generation.
+- **Research first:** live research must return at least two distinct public source URLs before product planning. If sources are unavailable, the run stops rather than inventing industry gaps.
+- **Build after planning:** Nova's product scope and acceptance criteria must precede source generation.
 - **QA/security feedback:** Tara and Shield review generated files; Dev gets one bounded remediation pass, and both reviewers re-review the revised files.
-- **Fail-closed release gate:** generated source, deterministic checks, and explicit `RELEASE_GATE: PASS` decisions from both QA and Security are required. Missing/uncertain review decisions block Seller and GitHub PR creation.
-- **Sales last:** Seller prepares positioning, pricing hypotheses, and outreach drafts only after the release gate passes. It never sends outreach automatically.
+- **Fail-closed release gate:** generated source, deterministic checks, and explicit `RELEASE_GATE: PASS` decisions from both QA and Security are required. Missing/uncertain review decisions block Lead Research, Seller and GitHub product PR creation.
+- **Sales last:** Lead Research provides public source evidence for buyer prospects; Seller prepares tailored outreach and a follow-up cadence. Neither agent may invent contacts. Messages are not sent automatically.
 - **No false test claims:** current deterministic checks are non-executing syntax/risk checks. Generated-product runtime tests are not considered passed unless an isolated test runner actually executes them; this app currently does not provide that sandbox.
 
 ## Queue, retries and honest runtime boundaries
