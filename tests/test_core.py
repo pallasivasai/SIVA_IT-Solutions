@@ -205,6 +205,17 @@ def test_code_builder_rejects_real_env_file():
         })
 
 
+def test_code_builder_allows_safe_env_example_template():
+    from code_builder import validate_file_bundle
+
+    files = validate_file_bundle({
+        "files": [
+            {"path": "README.md", "content": "# Demo"},
+            {"path": ".env.example", "content": "API_BASE_URL=https://example.invalid\nAPI_KEY=\n"},
+        ]
+    })
+    assert "generated-project/.env.example" in files
+
 
 def test_code_builder_allows_common_secret_placeholders_in_env_example():
     from code_builder import validate_file_bundle
