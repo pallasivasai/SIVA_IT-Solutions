@@ -252,13 +252,31 @@ elif page == "AI Project Room":
                     )
                     outputs["product_strategy"] = strategy["output"]
                     progress.write("Nova completed the project plan and specialist task breakdown")
-                    implementation = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
+                    dev_handoff = (
+                        "DEV IMPLEMENTATION HAND-OFF FROM NOVA (PROJECT MANAGER). Build the product described in Nova's approved plan; "
+                        "do not merely write recommendations. Follow the MVP scope and acceptance criteria exactly. "
+                        "Your output must specify concrete files, modules, interfaces, data model, validation, error handling, and tests. "
+                        "The next code-builder step will generate the actual source files from your implementation notes.\n\n"
+                        "USER REQUIREMENT:\n" + task + "\n\nPRODUCT PLAN:\n" +
+                        outputs.get("product_strategy", "")[:12000] + "\n\nSCOUT EVIDENCE:\n" +
+                        outputs.get("research", "")[:6000]
+                    )
+                    progress.write("💻 Dev · Software Engineer — accepting Nova's plan and preparing implementation…")
+                    implementation = run_agent_step(router, store, run_id, team[2], current_project, dev_handoff, outputs)
                     outputs["implementation"] = implementation["output"]
-                    progress.write("Dev prepared implementation notes")
+                    store.add_event(run_id, "Dev", dev_handoff, "implementation_ready", "completed",
+                                    summary="Implementation hand-off prepared for source generation")
+                    progress.write("Dev implementation hand-off ready; generating actual source files next")
                     generated_files: dict[str, str] = {}
                     try:
-                        progress.write("Dev is generating actual product source files…")
-                        build_brief = task + "\n\nPRODUCT STRATEGY / GAP TO FILL:\n" + outputs["product_strategy"] + "\n\nMARKET EVIDENCE:\n" + outputs["market_evidence"]
+                        progress.write("💻 Dev · Code Builder — generating the actual MVP source files from Nova's plan…")
+                        store.add_event(run_id, "Dev", task, "code_generation_started", "running",
+                                        summary="Generating actual product source files from the project plan")
+                        build_brief = (
+                            task + "\n\nPRODUCT STRATEGY / GAP TO FILL:\n" + outputs["product_strategy"] +
+                            "\n\nSCOUT RESEARCH / SOURCE EVIDENCE:\n" + outputs["market_evidence"] +
+                            "\n\nIMPLEMENTATION DESIGN FROM DEV:\n" + outputs["implementation"]
+                        )
                         generated_files = build_project_files(router, current_project, build_brief, outputs["product_strategy"], outputs["implementation"])
                         outputs["generated_files_summary"] = "\n".join(f"- {path}" for path in generated_files)
                         outputs["generated_files_context"] = "\n\n".join(f"### {path}\n{body[:6000]}" for path, body in list(generated_files.items())[:8])[:24000]
@@ -267,10 +285,11 @@ elif page == "AI Project Room":
                         outputs["generated_files_context"] += "\n\n## Deterministic non-executing checks\n" + outputs["static_qa"]
                         store.add_event(run_id, "Dev · Code Builder", task, "code_files_generated", "completed", summary=f"Generated {len(generated_files)} reviewable source files")
                         progress.write(f"Generated {len(generated_files)} real source files")
-                    except CodeBuildError as exc:
-                        outputs["code_build_error"] = str(exc)
-                        store.add_event(run_id, "Dev · Code Builder", task, "code_generation_failed", "failed", summary=str(exc))
-                        progress.write(f"Code generation needs retry: {exc}")
+                    except Exception as exc:
+                        outputs["code_build_error"] = f"{type(exc).__name__}: {exc}"
+                        store.add_event(run_id, "Dev", task, "code_generation_failed", "failed",
+                                        summary=outputs["code_build_error"])
+                        progress.error("Dev could not generate the product source files: " + outputs["code_build_error"])
                     qa = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
                     outputs["qa"] = qa["output"]
                     progress.write("Tara completed the QA report")
@@ -417,6 +436,8 @@ elif page == "AI Project Room":
     if result:
         st.markdown(f"### Latest run · {result['project']}")
         st.caption(f"Run ID: {result['run_id']}")
+        if result.get("outputs", {}).get("workflow_error"):
+            st.error("Workflow error: " + str(result["outputs"]["workflow_error"]))
         if result.get("outputs", {}).get("market_gate"):
             with st.expander("🔎 Research gate evidence", expanded=False):
                 st.json(result["outputs"]["market_gate"])
