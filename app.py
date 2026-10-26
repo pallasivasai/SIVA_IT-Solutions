@@ -66,7 +66,16 @@ st.markdown("""
 .workbench-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#eaf3ff;margin-bottom:12px}
 .workbench-head .sub{color:#9fb3c9;font-size:.8rem}
 .workbench-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.workbench-agent{border:1px solid #30465b;border-radius:12px;padding:12px;background:linear-gradient(160deg,#17283a,#101b2a);min-height:170px;box-shadow:0 6px 18px #0003}
+.workbench-agent{position:relative;border:1px solid #314b63;border-radius:18px;padding:15px;background:linear-gradient(155deg,rgba(26,45,65,.98),rgba(12,23,37,.98));min-height:170px;box-shadow:0 10px 28px #0003;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease;overflow:hidden}
+.workbench-agent:before{content:"";position:absolute;inset:0 0 auto;height:3px;background:linear-gradient(90deg,#16c5e7,#5be6b4);opacity:.45}
+.workbench-agent:hover{transform:translateY(-3px);border-color:#54cfe7;box-shadow:0 16px 34px #0005}
+.workbench-agent .wb-name{letter-spacing:-.02em}.workbench-agent .wb-role{font-size:.72rem}
+.wb-icon{box-shadow:0 5px 14px #0003}.wb-person{height:164px;border-radius:14px;background:radial-gradient(ellipse at 50% 8%,#385f7b 0%,#1b354c 63%,#132437 100%);border-color:#456984;box-shadow:inset 0 1px 0 #ffffff18,0 7px 16px #0002}
+.wb-state{letter-spacing:.035em;padding:5px 10px}.wb-task{font-size:.79rem;line-height:1.5}.wb-summary{font-size:.72rem;line-height:1.55}
+.wb-progress{height:6px;background:#293d52}.wb-progress span{box-shadow:0 0 12px #21d6cb55}
+.workbench{border-color:#2b455d;background:radial-gradient(ellipse at top left,#172b3f,#0b1421 70%);box-shadow:0 16px 40px #0003}
+.workbench-head{padding:2px 2px 10px;border-bottom:1px solid #263d52}
+@media(prefers-reduced-motion:reduce){.workbench-agent{transition:none}.workbench-agent:hover{transform:none}}
 .workbench-agent.active{border-color:#29c7f4;box-shadow:0 0 0 1px #29c7f455,0 8px 22px #0004}
 .workbench-agent.done{border-color:#248d69}.workbench-agent.failed{border-color:#d65757}.workbench-agent.waiting{opacity:.83}
 .wb-top{display:flex;gap:9px;align-items:center}.wb-icon{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:#21384e;border:1px solid #42617c;font-size:23px;flex-shrink:0}
@@ -563,9 +572,11 @@ elif page == "AI Project Room":
                         progress.write("Lead Research is finding sourced, relevant prospects…")
                         store.add_event(run_id, "Lead Research", task, "agent_started", "running", summary="Searching for sourced buyers relevant to the finished product")
                         draw_project_room_agents(run_id)
-                        outputs["lead_evidence"] = build_research_context(
+                        lead_research_pack = collect_market_research(
                             "businesses and companies likely to buy " + current_project + " in India and relevant target markets public company websites contact page"
                         )
+                        outputs["lead_evidence"] = lead_research_pack["context"]
+                        outputs["lead_source_rows"] = lead_research_pack["results"]
                         leads = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
                         outputs["leads"] = leads["output"]
                         draw_project_room_agents(run_id)
@@ -574,6 +585,39 @@ elif page == "AI Project Room":
                         draw_project_room_agents(run_id)
                         sales = run_agent_step(router, store, run_id, team[7], current_project, task, outputs)
                         outputs["sales"] = sales["output"]
+                        try:
+                            from leads_export import build_leads_workbook, save_leads_workbook
+                            lead_rows = [
+                                {"Company / Result": row.get("title", ""), "Public Source URL": row.get("url", ""),
+                                 "Evidence / Search Snippet": row.get("snippet", ""),
+                                 "Contact Status": "Needs verification — no contact details inferred",
+                                 "Product": current_project, "Research Run ID": run_id}
+                                for row in outputs.get("lead_source_rows", [])
+                                if row.get("url", "").startswith(("https://", "http://"))
+                            ]
+                            workbook_bytes = build_leads_workbook(lead_rows, current_project, run_id)
+                            workbook_path = save_leads_workbook(workbook_bytes, current_project, run_id)
+                            outputs["leads_workbook_bytes"] = workbook_bytes
+                            outputs["leads_workbook_path"] = workbook_path
+                            store.add_event(run_id, "Lead Research", task, "leads_workbook_created", "completed",
+                                            summary=f"Saved {len(lead_rows)} sourced research rows to {workbook_path}")
+                            try:
+                                github_service = GitHubService()
+                                workbook_pr = github_service.create_binary_change_request(
+                                    project_name=current_project,
+                                    task=f"Add sourced lead research workbook for {current_project}",
+                                    path=f"sales-leads/{run_id[:8]}-{GitHubService._slug(current_project)}-leads.xlsx",
+                                    content=workbook_bytes, base_branch=base_branch.strip() or "main")
+                                outputs["leads_github_pr"] = workbook_pr
+                                store.add_event(run_id, "Lead Research", task, "leads_workbook_pr_created", "completed",
+                                                summary=f"Lead workbook PR #{workbook_pr['number']}: {workbook_pr['url']}")
+                            except Exception as publish_exc:
+                                outputs["leads_github_error"] = f"{type(publish_exc).__name__}: {publish_exc}"
+                                store.add_event(run_id, "Lead Research", task, "leads_workbook_publish_failed", "failed",
+                                                summary=outputs["leads_github_error"])
+                        except Exception as export_exc:
+                            outputs["leads_export_error"] = f"{type(export_exc).__name__}: {export_exc}"
+                            progress.warning("Lead workbook export failed: " + outputs["leads_export_error"])
                         progress.write("Seller prepared tailored outreach and a follow-up sequence; no messages were sent.")
                     else:
                         outputs["sales"] = "BLOCKED: Seller is not allowed to proceed until QA, security, and deterministic source checks explicitly pass.\n" + "\n".join(release_gate["reasons"])
@@ -642,6 +686,20 @@ elif page == "AI Project Room":
             st.link_button("Open product Pull Request", pr_info["url"])
         elif result.get("outputs", {}).get("github_publish_error"):
             st.error("GitHub Integrator could not publish the product: " + result["outputs"]["github_publish_error"])
+        if result.get("outputs", {}).get("leads_workbook_bytes"):
+            wb = result["outputs"]["leads_workbook_bytes"]
+            wb_name = result["outputs"].get("leads_workbook_path", "sales-leads.xlsx").split("/")[-1]
+            st.download_button("Download sourced leads Excel (.xlsx)", data=wb, file_name=wb_name,
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            if result.get("outputs", {}).get("leads_github_pr"):
+                lead_pr = result["outputs"]["leads_github_pr"]
+                st.success(f"Lead workbook submitted to GitHub as PR #{lead_pr['number']}.")
+                st.link_button("Review leads workbook PR", lead_pr["url"])
+            elif result.get("outputs", {}).get("leads_github_error"):
+                st.warning("Excel was created for download, but GitHub upload failed: " + result["outputs"]["leads_github_error"] +
+                           " Check GITHUB_TOKEN repository Contents and Pull requests write permissions.")
+        elif result.get("outputs", {}).get("leads_export_error"):
+            st.error("Could not create leads workbook: " + result["outputs"]["leads_export_error"])
         st.warning("Generated product files are published as a reviewable GitHub PR after QA/security gates. This app does not merge PRs or deploy products automatically.")
         release_ready = bool(result.get("outputs", {}).get("release_gate", {}).get("passed"))
         if not release_ready:
