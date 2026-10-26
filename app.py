@@ -15,7 +15,7 @@ from market_research import build_research_context, collect_market_research
 from pipeline_gates import evaluate_market_gate, evaluate_release_gate
 from storage import EventStore
 
-st.set_page_config(page_title="SIVA IT Solutions · AI Office", page_icon="🏢", layout="wide")
+st.set_page_config(page_title="SIVA IT Solutions · AI Office", page_icon="", layout="wide")
 
 # This repo is public. Require an owner-configured password before exposing API-backed actions.
 import hmac
@@ -27,7 +27,7 @@ except Exception:
 
 PASSWORD_CONFIGURED = bool(APP_PASSWORD and APP_PASSWORD != "change-this-to-a-long-random-password")
 if PASSWORD_CONFIGURED and not st.session_state.get("authenticated", False):
-    st.title("🔐 SIVA IT Solutions · Secure Office Login")
+    st.title(" SIVA IT Solutions · Secure Office Login")
     entered = st.text_input("Office access password", type="password")
     if st.button("Unlock dashboard", type="primary"):
         if hmac.compare_digest(entered, APP_PASSWORD):
@@ -94,6 +94,48 @@ st.markdown("""
 @media(max-width:1100px){.workbench-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.workbench-grid{grid-template-columns:1fr}.workbench-agent{min-height:0}}
 
 @media(max-width:900px){.office-floor{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px;gap:8px}.agent-station{min-height:140px}.hero h1{font-size:1.6rem}}@media(max-width:480px){.office-floor{grid-template-columns:repeat(2,minmax(0,1fr))}.agent-role{font-size:.55rem}}
+
+/* Enterprise UI polish: restrained palette, clear hierarchy, consistent surfaces. */
+.stApp{background:linear-gradient(145deg,#0b1220 0%,#101b2b 48%,#0b1220 100%);color:#e7edf6;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+.block-container{max-width:1680px;padding-top:1.35rem;padding-bottom:2.5rem}
+[data-testid="stSidebar"]{background:#f4f6fa;border-right:1px solid #dce3ed}
+[data-testid="stSidebar"] *{color:#263449}
+[data-testid="stSidebar"] [data-testid="stRadio"] label{padding:7px 10px;border-radius:9px}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover{background:#e8edf5}
+.hero{border:1px solid #263b54;border-radius:18px;background:linear-gradient(120deg,#162b40,#101a2a);padding:1.6rem 1.8rem;box-shadow:0 16px 40px #0003}
+.hero h1{font-size:clamp(1.7rem,3vw,2.35rem);letter-spacing:-.04em;font-weight:800}
+.kicker{font-size:.68rem;letter-spacing:.18em;color:#55d6c2}
+.stButton>button,.stDownloadButton>button,[data-testid="stLinkButton"] a{border-radius:10px;border:1px solid #3b526d;font-weight:650;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+.stButton>button[kind="primary"]{background:linear-gradient(100deg,#087fa8,#0e9b91);border-color:#21b7bd;color:white}
+.stButton>button:hover,.stDownloadButton>button:hover{transform:translateY(-1px);border-color:#35c5d8;box-shadow:0 7px 18px #0002}
+div[data-testid="stMetric"]{border:1px solid #263b52;background:linear-gradient(145deg,#17263a,#111c2d);border-radius:14px;padding:15px 16px;box-shadow:0 8px 20px #0002}
+div[data-testid="stMetric"] label{color:#9fb1c8}
+div[data-testid="stMetric"] [data-testid="stMetricValue"]{font-weight:800;letter-spacing:-.03em}
+.stApp h1,.stApp h2,.stApp h3{letter-spacing:-.025em}
+.stApp hr{border-color:#2b3e54}
+.stApp [data-testid="stExpander"]{border:1px solid #2a4058;border-radius:12px;background:#111d2d;overflow:hidden}
+.stApp [data-testid="stExpander"] summary{font-weight:650}
+.workbench{padding:18px;border-radius:18px;border-color:#293f58;background:linear-gradient(145deg,#142438,#0c1523);box-shadow:0 18px 44px #0003}
+.workbench-head{padding:4px 3px 14px;margin-bottom:16px;border-bottom:1px solid #293d52}
+.workbench-grid{gap:14px}
+.workbench-agent{border:1px solid #2d455f;border-radius:15px;background:linear-gradient(155deg,#1a2b40,#101b2a);padding:16px;box-shadow:0 8px 22px #0002}
+.workbench-agent:before{height:2px;opacity:.75}
+.workbench-agent:hover{transform:translateY(-2px);box-shadow:0 14px 30px #0004}
+.wb-person{height:138px;border-radius:12px;background:linear-gradient(145deg,#213e57,#13283d);border-color:#35546e}
+.wb-state{font-size:.65rem;letter-spacing:.07em;text-transform:uppercase}
+.wb-task{font-size:.8rem;line-height:1.55}
+.wb-summary{font-size:.72rem;line-height:1.55}
+.wb-progress{height:5px;background:#2b3c50}
+.taskline{border:1px solid #2a4057;border-left:3px solid #36c8ba;border-radius:0 10px 10px 0;background:#122033;padding:13px 15px}
+.office-shell{border:1px solid #2d4558;border-radius:14px;background:#111c2b}
+.office-top,.office-bottom{background:#101a28}
+.office-floor{background-color:#dfe8e5;background-image:linear-gradient(#d1ddd9 1px,transparent 1px),linear-gradient(90deg,#d1ddd9 1px,transparent 1px)}
+.agent-station{border:1px solid #b6c9c3;border-radius:10px;box-shadow:0 5px 14px #172b3214}
+.agent-sprite{border-radius:50%;box-shadow:0 3px 8px #1d344433}
+.agent-desk{border-radius:4px}
+@media(max-width:900px){.block-container{padding-left:1rem;padding-right:1rem}.hero{padding:1.2rem}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -106,15 +148,15 @@ if "last_run" not in st.session_state:
     st.session_state.last_run = None
 
 with st.sidebar:
-    st.markdown("## 🏢 SIVA IT Solutions")
+    st.markdown("##  SIVA IT Solutions")
     st.caption("AI Company Control Center")
     page = st.radio("Workspace", ["AI Project Room", "Task Board", "Office Floor", "GitHub Pull Requests", "Settings & Setup"])
     st.divider()
     st.markdown("**Agent hand-offs**")
-    st.write("🔎 Scout research → 💡 Nova Project Manager plan")
-    st.write("💻 Dev → 🧪 QA → 🛡️ Security")
-    st.write("🛡️ Security → 🔀 GitHub Release Agent")
-    st.write("🧭 Leads → 📈 Seller follow-up")
+    st.write(" Scout research →  Nova Project Manager plan")
+    st.write(" Dev →  QA →  Security")
+    st.write(" Security →  GitHub Release Agent")
+    st.write(" Leads →  Seller follow-up")
     st.caption("No API keys belong in source code.")
 
 st.markdown("""
@@ -136,7 +178,7 @@ m4.metric("PRs recorded", pr_count)
 
 if page == "Office Floor":
     import html
-    st.subheader("🏢 Virtual AI Office")
+    st.subheader(" Virtual AI Office")
     st.caption("Auto-refreshes every 5 seconds and displays events from the newest workflow run only. WORKING/DONE/ERROR are event-driven; this refresh does not itself run a background worker.")
     latest: dict[str, dict[str, Any]] = {}
     def canonical_agent_name(raw_name: str) -> str:
@@ -161,12 +203,12 @@ if page == "Office Floor":
         summary = html.escape(str(ev.get("summary", "No activity recorded for this agent yet"))[:180])
         name = html.escape(str(agent["name"]))
         role = html.escape(str(agent["role"].split("·")[0].strip()))
-        emoji = html.escape(str(agent.get("emoji", "🤖")))
+        emoji = html.escape(str(agent.get("emoji", "")))
         stations.append('<div class="agent-station"><div class="agent-sprite">' + emoji + '</div><div class="agent-desk"></div><div class="agent-name">' + name + '</div><div class="agent-role">' + role + '</div><div class="agent-status ' + css_status + '">' + status + '</div><div style="margin-top:5px;text-align:center;color:#3c5b5b;font-size:.65rem">' + task + '</div><div style="margin-top:5px;text-align:center;color:#243f45;font-size:.62rem;line-height:1.35">' + summary + '</div></div>')
     office_html = '<div class="office-shell"><div class="office-top"><span>▦ SIVA IT SOLUTIONS · FLOOR 01</span><span>8 SPECIALIST WORKSTATIONS · AUTO-REFRESH 5s</span></div><div class="office-floor">' + "".join(stations) + '</div><div class="office-bottom"><span>● VIEW OF RECORDED EVENTS</span><span>Human approval required · No auto-merge/deploy</span></div></div>'
     st.markdown(office_html, unsafe_allow_html=True)
     st.divider()
-    st.subheader("🧭 Workflow lane")
+    st.subheader(" Workflow lane")
     stages = [("1 · Scout — Market research", "Finds evidence-backed industry gaps and competitors before any product plan."), ("2 · Nova — Product plan", "Defines the MVP, target users and acceptance criteria from research."), ("3 · Dev — Build", "Creates the actual product source and fixes reviewer findings."), ("4 · Tara — QA", "Tests acceptance criteria and reports defects to Dev."), ("5 · Shield — Security", "Reviews security and re-checks fixes; release stays blocked on unresolved high risks."), ("6 · GitHub Integrator — Publish product", "Creates a reviewable product PR after QA, security and static checks pass; never merges or deploys."), ("7 · Lead Research — Buyer leads", "Finds relevant prospects with verifiable public sources after release readiness."), ("8 · Seller — Outreach/follow-up", "Creates prospect-specific messages and a follow-up schedule; sending requires approval.")]
     for title, desc in stages:
         st.markdown('<div class="taskline"><b>' + title + '</b><br><span class="smallmuted">' + desc + '</span></div>', unsafe_allow_html=True)
@@ -180,7 +222,7 @@ if page == "Office Floor":
         st.rerun()
 
 elif page == "Task Board":
-    st.subheader("📋 Task board / activity log")
+    st.subheader(" Task board / activity log")
     ids = sorted({str(e.get("run_id")) for e in events if e.get("run_id")}, reverse=True)
     selected = st.selectbox("Filter by workflow run", ["All runs"] + ids)
     shown = events if selected == "All runs" else [e for e in events if str(e.get("run_id")) == selected]
@@ -197,7 +239,7 @@ elif page == "Task Board":
 
 elif page == "AI Project Room":
     import html
-    st.subheader("🧩 AI Project Room · Live Agent Workbench")
+    st.subheader(" AI Project Room · Live Agent Workbench")
     st.write("Enter one product goal below. Every specialist's workstation, assigned task and live status stays visible on this page—no need to open Office Floor. The workflow hands each deliverable to the next agent automatically.")
     agent_board_slot = st.empty()
 
@@ -292,7 +334,7 @@ elif page == "AI Project Room":
             task_text = html.escape(str(ev.get("task") or default_tasks.get(name, "Waiting for upstream hand-off"))[:210])
             summary_text = html.escape(str(ev.get("summary") or "Waiting for its prerequisite deliverable.")[:180])
             role_text = html.escape(str(agent["role"].split("·")[0].strip()))
-            emoji = html.escape(str(agent.get("emoji", "🤖")))
+            emoji = html.escape(str(agent.get("emoji", "")))
             safe_name = html.escape(name)
             cards.append(
                 f'<div class="workbench-agent {css_state}"><div class="wb-top"><div class="wb-icon">{emoji}</div>'
@@ -303,7 +345,7 @@ elif page == "AI Project Room":
             )
         current = html.escape(run_id_for_board or "No workflow started")
         agent_board_slot.markdown(
-            '<div class="workbench"><div class="workbench-head"><div><b>🧑‍💻 Specialist workstations</b>'
+            '<div class="workbench"><div class="workbench-head"><div><b> Specialist workstations</b>'
             '<div class="sub">Each card shows the task and latest recorded state · same page · no simulated background worker</div></div>'
             f'<div class="sub">Run: {current}</div></div><div class="workbench-grid">{"".join(cards)}</div></div>',
             unsafe_allow_html=True,
@@ -353,7 +395,7 @@ elif page == "AI Project Room":
                 store.add_event(run_id, "Scout", task, "agent_started", "running",
                                 summary="Scout is collecting public market evidence and competitor sources")
                 draw_project_room_agents(run_id)
-                progress.write("🔎 Scout · Market Researcher — collecting public evidence and competitor sources…")
+                progress.write(" Scout · Market Researcher — collecting public evidence and competitor sources…")
                 research_pack = collect_market_research(task)
                 outputs["market_evidence"] = research_pack["context"]
                 outputs["market_sources"] = research_pack["results"]
@@ -389,7 +431,7 @@ elif page == "AI Project Room":
                     outputs["research"] = scout["output"]
                     draw_project_room_agents(run_id)
                     progress.write("Scout completed gap research")
-                    progress.write("💡 Nova · Project Manager — reviewing Scout's evidence and creating the product plan/task breakdown…")
+                    progress.write(" Nova · Project Manager — reviewing Scout's evidence and creating the product plan/task breakdown…")
                     store.add_event(run_id, "Nova", task, "agent_started", "running", summary="Reviewing Scout's evidence and planning the MVP")
                     draw_project_room_agents(run_id)
                     strategy = run_agent_step(
@@ -409,7 +451,7 @@ elif page == "AI Project Room":
                         outputs.get("product_strategy", "")[:12000] + "\n\nSCOUT EVIDENCE:\n" +
                         outputs.get("research", "")[:6000]
                     )
-                    progress.write("💻 Dev · Software Engineer — accepting Nova's plan and preparing implementation…")
+                    progress.write(" Dev · Software Engineer — accepting Nova's plan and preparing implementation…")
                     store.add_event(run_id, "Dev", dev_handoff, "agent_started", "running", summary="Translating Nova's plan into an implementation design")
                     draw_project_room_agents(run_id)
                     implementation = run_agent_step(router, store, run_id, team[2], current_project, dev_handoff, outputs)
@@ -420,7 +462,7 @@ elif page == "AI Project Room":
                     progress.write("Dev implementation hand-off ready; generating actual source files next")
                     generated_files: dict[str, str] = {}
                     try:
-                        progress.write("💻 Dev · Code Builder — generating the actual MVP source files from Nova's plan…")
+                        progress.write(" Dev · Code Builder — generating the actual MVP source files from Nova's plan…")
                         store.add_event(run_id, "Dev · Code Builder", task, "code_generation_started", "running",
                                         summary="Generating actual product source files from the project plan")
                         draw_project_room_agents(run_id)
@@ -662,12 +704,12 @@ elif page == "AI Project Room":
         if result.get("outputs", {}).get("workflow_error"):
             st.error("Workflow error: " + str(result["outputs"]["workflow_error"]))
         if result.get("outputs", {}).get("market_gate"):
-            with st.expander("🔎 Research gate evidence", expanded=False):
+            with st.expander(" Research gate evidence", expanded=False):
                 st.json(result["outputs"]["market_gate"])
         if result.get("outputs", {}).get("release_gate"):
-            with st.expander("🚦 Final release gate", expanded=True):
+            with st.expander(" Final release gate", expanded=True):
                 st.json(result["outputs"]["release_gate"])
-        for label, key in [("🔎 Industry gap research","research"),("💡 Product plan","product_strategy"),("💻 Developer hand-off","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security"),("🔀 GitHub release agent","github_release"),("🧭 Sourced sales leads","leads"),("📈 Seller outreach + follow-up plan","sales")]:
+        for label, key in [(" Industry gap research","research"),(" Product plan","product_strategy"),(" Developer hand-off","implementation"),(" QA report","qa"),(" Security review","security"),(" GitHub release agent","github_release"),(" Sourced sales leads","leads"),(" Seller outreach + follow-up plan","sales")]:
             with st.expander(label, expanded=(key == "plan")):
                 st.markdown(result["outputs"].get(key, "No report available."))
         if result.get("code_build_error"):
@@ -718,7 +760,7 @@ elif page == "AI Project Room":
                 st.error(f"Could not create PR: {exc}")
 
 elif page == "GitHub Pull Requests":
-    st.subheader("🔀 Human review queue")
+    st.subheader(" Human review queue")
     st.write("Review and approve directly in GitHub. The app intentionally cannot merge or deploy.")
     token = os.getenv("GITHUB_TOKEN", "")
     try:
@@ -745,10 +787,10 @@ elif page == "GitHub Pull Requests":
             st.error(str(exc))
 
 else:
-    st.subheader("⚙️ Setup and guardrails")
+    st.subheader(" Setup and guardrails")
     st.markdown("### Streamlit Secrets")
     st.code('APP_PASSWORD = "your-strong-password"\nOPENAI_API_KEY = "your-key"\nOPENAI_MODEL = "gpt-4.1-mini"\nGEMINI_API_KEY = "your-key"\nGEMINI_MODEL = "gemini-2.5-flash"\nGITHUB_TOKEN = "fine-grained-token"\nGITHUB_OWNER = "pallasivasai"\nGITHUB_REPO = "SIVA_IT-Solutions"', language="toml")
-    st.write("✅ AI can create feature branches and PRs.\n\n✅ CI runs unit tests.\n\n⛔ No automatic PR merge.\n\n⛔ No production deploy or generated-code execution.")
+    st.write(" AI can create feature branches and PRs.\n\n CI runs unit tests.\n\n No automatic PR merge.\n\n No production deploy or generated-code execution.")
     st.warning("Configure branch protection on main and require PR review / passing checks where supported. Never commit keys.")
     st.markdown("Deploy using [Streamlit Community Cloud](https://share.streamlit.io/) with this repository and `app.py`; configure Settings → Secrets.")
     st.markdown("### Honest limitations")
