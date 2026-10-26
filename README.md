@@ -3,7 +3,7 @@
 A Streamlit dashboard for a role-based AI engineering workflow. It displays agent-role cards, task events, provider selection, QA/security hand-offs and GitHub PR review links.
 
 ## Included features
-- **Office Floor:** Task Assignment Lead, Market Researcher, Product Strategist, Software Engineer, QA Engineer, Security Reviewer and Go-to-Market/Sales agent cards.
+- **Virtual Office Floor:** a pixel-art office layout with seven agent workstations, role labels and status badges driven by recorded workflow events; includes a workflow lane and recent activity log.
 - **Task Board:** timestamped activity events and run filtering.
 - **AI Project Room:** task assignment → public web evidence collection → industry-gap research → product strategy → source generation → QA/security reviews → sales plan → human-reviewed GitHub PR.
 - **OpenAI primary + Gemini fallback:** fallback for likely quota/rate-limit/transient failures when Gemini is configured.
