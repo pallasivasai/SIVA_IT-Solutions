@@ -74,8 +74,8 @@ with st.sidebar:
     st.markdown("**Agent hand-offs**")
     st.write("🔎 Research → 💡 Product plan")
     st.write("💻 Dev → 🧪 QA → 🛡️ Security")
+    st.write("🛡️ Security → 🔀 GitHub Release Agent")
     st.write("🧭 Leads → 📈 Seller follow-up")
-    st.write("🔀 Human-reviewed GitHub PR")
     st.caption("No API keys belong in source code.")
 
 st.markdown("""
@@ -127,7 +127,7 @@ if page == "Office Floor":
         role = html.escape(str(agent["role"].split("·")[0].strip()))
         emoji = html.escape(str(agent.get("emoji", "🤖")))
         stations.append('<div class="agent-station"><div class="agent-sprite">' + emoji + '</div><div class="agent-desk"></div><div class="agent-name">' + name + '</div><div class="agent-role">' + role + '</div><div class="agent-status ' + css_status + '">' + status + '</div><div style="margin-top:5px;text-align:center;color:#3c5b5b;font-size:.65rem">' + task + '</div><div style="margin-top:5px;text-align:center;color:#243f45;font-size:.62rem;line-height:1.35">' + summary + '</div></div>')
-    office_html = '<div class="office-shell"><div class="office-top"><span>▦ SIVA IT SOLUTIONS · FLOOR 01</span><span>7 SPECIALIST WORKSTATIONS · AUTO-REFRESH 5s</span></div><div class="office-floor">' + "".join(stations) + '</div><div class="office-bottom"><span>● VIEW OF RECORDED EVENTS</span><span>Human approval required · No auto-merge/deploy</span></div></div>'
+    office_html = '<div class="office-shell"><div class="office-top"><span>▦ SIVA IT SOLUTIONS · FLOOR 01</span><span>8 SPECIALIST WORKSTATIONS · AUTO-REFRESH 5s</span></div><div class="office-floor">' + "".join(stations) + '</div><div class="office-bottom"><span>● VIEW OF RECORDED EVENTS</span><span>Human approval required · No auto-merge/deploy</span></div></div>'
     st.markdown(office_html, unsafe_allow_html=True)
     st.divider()
     st.subheader("🧭 Workflow lane")
@@ -374,7 +374,7 @@ elif page == "AI Project Room":
         if result.get("outputs", {}).get("release_gate"):
             with st.expander("🚦 Final release gate", expanded=True):
                 st.json(result["outputs"]["release_gate"])
-        for label, key in [("🔎 Industry gap research","research"),("💡 Product plan","product_strategy"),("💻 Developer hand-off","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security"),("🧭 Sourced sales leads","leads"),("📈 Seller outreach + follow-up plan","sales")]:
+        for label, key in [("🔎 Industry gap research","research"),("💡 Product plan","product_strategy"),("💻 Developer hand-off","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security"),("🔀 GitHub release agent","github_release"),("🧭 Sourced sales leads","leads"),("📈 Seller outreach + follow-up plan","sales")]:
             with st.expander(label, expanded=(key == "plan")):
                 st.markdown(result["outputs"].get(key, "No report available."))
         if result.get("code_build_error"):
@@ -387,13 +387,19 @@ elif page == "AI Project Room":
                     st.code(body, language=path.rsplit(".", 1)[-1] if "." in path else "text")
         else:
             st.info("No source files are available yet. Re-run with a smaller, specific MVP requirement to generate a product.")
-        st.warning("Generated files are reviewed as a GitHub PR. This app does not execute generated code, merge PRs, or deploy products automatically.")
+        if result.get("outputs", {}).get("github_pr"):
+            pr_info = result["outputs"]["github_pr"]
+            st.success(f"GitHub Integrator published the product bundle as PR #{pr_info['number']}.")
+            st.link_button("Open product Pull Request", pr_info["url"])
+        elif result.get("outputs", {}).get("github_publish_error"):
+            st.error("GitHub Integrator could not publish the product: " + result["outputs"]["github_publish_error"])
+        st.warning("Generated product files are published as a reviewable GitHub PR after QA/security gates. This app does not merge PRs or deploy products automatically.")
         release_ready = bool(result.get("outputs", {}).get("release_gate", {}).get("passed"))
         if not release_ready:
             st.error("Release blocked: QA, security, and deterministic checks must all pass before a product PR can be created.")
             for reason in result.get("outputs", {}).get("release_gate", {}).get("reasons", []):
                 st.write("• " + reason)
-        if st.button("Create feature branch + GitHub Pull Request", type="primary", key=f"pr_{result['run_id']}", disabled=not PASSWORD_CONFIGURED or not generated_files or not release_ready):
+        if st.button("Retry GitHub publication", type="primary", key=f"pr_{result['run_id']}", disabled=not PASSWORD_CONFIGURED or not generated_files or not release_ready or bool(result.get("outputs", {}).get("github_pr"))):
             try:
                 gh = GitHubService()
                 bundle = gh.generate_file_bundle(result)
