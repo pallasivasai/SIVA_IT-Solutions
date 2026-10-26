@@ -223,7 +223,7 @@ def test_code_builder_allows_common_secret_placeholders_in_env_example():
     files = validate_file_bundle({
         "files": [{
             "path": ".env.example",
-            "content": "OPENAI_API_KEY=YOUR_API_KEY_HERE\\nGITHUB_TOKEN=replace_me\\nDB_PASSWORD=<your-password>\\n"
+            "content": "OPENAI_API_KEY=YOUR_API_KEY_HERE\nGITHUB_TOKEN=replace_me\nDB_PASSWORD=<your-password>\n"
         }]
     })
     assert "generated-project/.env.example" in files
