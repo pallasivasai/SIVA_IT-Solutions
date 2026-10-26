@@ -300,14 +300,47 @@ elif page == "AI Project Room":
                                     "completed" if release_gate["passed"] else "blocked",
                                     summary="; ".join(release_gate["reasons"]) if release_gate["reasons"] else "QA, security and deterministic checks passed")
                     if release_gate["passed"]:
-                        progress.write("Release gate passed. Lead Research is finding sourced, relevant prospects…")
+                        progress.write("Release gate passed. GitHub Integrator is publishing the reviewed product bundle…")
+                        try:
+                            github_agent = run_agent_step(
+                                router, store, run_id, team[5], current_project,
+                                "Publish the completed product bundle to GitHub as a reviewable pull request. "
+                                "Base branch: " + (base_branch.strip() or "main") +
+                                ". Do not merge or deploy. Report the exact PR URL and branch.",
+                                outputs,
+                            )
+                            outputs["github_release"] = github_agent["output"]
+                            release_result = {
+                                "run_id": run_id, "project": current_project, "task": task,
+                                "outputs": outputs, "files": generated_files,
+                            }
+                            github_service = GitHubService()
+                            github_bundle = github_service.generate_file_bundle(release_result)
+                            github_pr = github_service.create_change_request(
+                                current_project, task, github_bundle,
+                                base_branch=base_branch.strip() or "main",
+                            )
+                            outputs["github_pr"] = github_pr
+                            store.add_event(
+                                run_id, "GitHub Integrator", task, "pull_request_created", "completed",
+                                summary=f"PR #{github_pr['number']}: {github_pr['url']}",
+                            )
+                            progress.write(f"GitHub Integrator created PR #{github_pr['number']}")
+                        except Exception as exc:
+                            outputs["github_publish_error"] = f"{type(exc).__name__}: {exc}"
+                            store.add_event(
+                                run_id, "GitHub Integrator", task, "github_publish_failed", "failed",
+                                summary=outputs["github_publish_error"],
+                            )
+                            progress.warning("GitHub publication failed; product files remain available below. Check GitHub token and repository settings.")
+                        progress.write("Lead Research is finding sourced, relevant prospects…")
                         outputs["lead_evidence"] = build_research_context(
                             "businesses and companies likely to buy " + current_project + " in India and relevant target markets public company websites contact page"
                         )
-                        leads = run_agent_step(router, store, run_id, team[5], current_project, task, outputs)
+                        leads = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
                         outputs["leads"] = leads["output"]
                         progress.write("Lead Research handed sourced prospect findings to Seller.")
-                        sales = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
+                        sales = run_agent_step(router, store, run_id, team[7], current_project, task, outputs)
                         outputs["sales"] = sales["output"]
                         progress.write("Seller prepared tailored outreach and a follow-up sequence; no messages were sent.")
                     else:
