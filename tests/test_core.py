@@ -4,8 +4,9 @@ from ai_providers import ProviderRouter
 
 def test_team_members_and_roles():
     team = build_team()
-    assert len(team) == 8
-    assert [m["name"] for m in team] == ["Atlas", "Mira", "Scout", "Nova", "Dev", "Tara", "Shield", "Seller"]
+    assert len(team) == 7
+    assert [m["name"] for m in team] == ["Scout", "Nova", "Dev", "Tara", "Shield", "Lead Research", "Seller"]
+    assert all("Task Assignment" not in member["role"] for member in team)
 
 
 def test_fallback_detector_recognizes_quota_and_transient_errors():
