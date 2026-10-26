@@ -83,8 +83,24 @@ def validate_file_bundle(data: dict[str, Any]) -> dict[str, str]:
             token in path.lower() for token in ("secret", "credential", "id_rsa", "workflow")
         ) or (".env" in path.lower() and not safe_env_template):
             raise CodeBuildError(f"Protected path rejected: {path[:100]}")
-        if safe_env_template and re.search(r"(?im)^\s*[A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)[A-Za-z0-9_]*\s*=\s*[^\s#]+", content):
-            raise CodeBuildError("The .env.example template must not contain populated secret values.")
+        if safe_env_template:
+            # .env.example commonly uses human-readable placeholders. Reject values that
+            # look populated, but allow safe placeholders such as YOUR_API_KEY_HERE,
+            # replace_me, changeme, <your-token>, and empty values.
+            secret_assignment = re.compile(
+                r"(?im)^\\s*[A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)[A-Za-z0-9_]*\\s*=\\s*([^\\s#]*)"
+            )
+            placeholder_value = re.compile(
+                r"(?i)^(?:|your(?:[-_][a-z0-9]+)*|replace(?:[-_]?me)?|change(?:[-_]?me)?|"
+                r"placeholder|example|dummy|insert(?:[-_]?here)?|enter(?:[-_]?here)?|todo|"
+                r"none|null|xxx+|<[^>]+>|\\$\\{[^}]+\\}|\\.\\.\\.)$"
+            )
+            for match in secret_assignment.finditer(content):
+                value = match.group(1).strip().strip('"\\'')
+                if value and not placeholder_value.fullmatch(value):
+                    raise CodeBuildError(
+                        "The .env.example template must not contain populated secret values."
+                    )
         suffix = "." + path.rsplit(".", 1)[-1].lower() if "." in path.rsplit("/", 1)[-1] else ""
         if suffix not in ALLOWED_SUFFIXES and not safe_env_template and path.lower() != "dockerfile":
             raise CodeBuildError(f"File type {suffix or '(none)'} is not allowed for generated projects.")
