@@ -73,3 +73,39 @@ def test_workflow_ledger_persists_messages_and_dependency_handoffs(tmp_path):
     board = ledger.task_board(run_id)
     assert next(item for item in board if item["stage_id"] == "competitors")["status"] == "ready"
     assert ledger.audit_log(run_id)
+
+
+def test_market_gate_requires_multiple_source_urls():
+    from pipeline_gates import evaluate_market_gate
+
+    assert not evaluate_market_gate("No verifiable results returned.")["passed"]
+    result = evaluate_market_gate(
+        "Research:\\nhttps://example.com/a evidence\\nhttps://example.org/b evidence"
+    )
+    assert result["passed"]
+    assert result["source_count"] == 2
+
+
+def test_release_gate_fails_closed_until_all_reviews_pass():
+    from pipeline_gates import evaluate_release_gate
+
+    files = {"generated-project/README.md": "# Demo"}
+    checks = {"passed": True, "failures": 0}
+    assert not evaluate_release_gate(files, checks, "QA okay", "Security okay")["passed"]
+    assert not evaluate_release_gate(files, checks, "RELEASE_GATE: PASS", "RELEASE_GATE: FAIL")["passed"]
+    passed = evaluate_release_gate(files, checks, "RELEASE_GATE: PASS", "RELEASE_GATE: PASS")
+    assert passed["passed"]
+    assert passed["status"] == "PASS"
+
+
+def test_release_gate_blocks_static_failures():
+    from pipeline_gates import evaluate_release_gate
+
+    result = evaluate_release_gate(
+        {"generated-project/app.py": "bad"},
+        {"passed": False, "failures": 1},
+        "RELEASE_GATE: PASS",
+        "RELEASE_GATE: PASS",
+    )
+    assert not result["passed"]
+    assert not result["static_checks_pass"]
