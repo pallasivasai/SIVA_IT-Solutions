@@ -49,6 +49,32 @@ st.markdown("""
 .smallmuted { color:#8fa2bd; font-size:.84rem; }
 .taskline { border-left:3px solid #64e2b7; background:rgba(17,31,48,.9); border-radius:0 10px 10px 0; padding:10px 14px; margin:.45rem 0; }
 div[data-testid="stMetric"] { background:rgba(16,27,43,.85); border:1px solid #26364d; padding:12px 14px; border-radius:14px; }
+.office-shell { background:#182b35; border:10px solid #31434a; border-radius:18px; padding:18px; box-shadow:inset 0 0 0 2px #0c1820, 0 12px 30px #0005; }
+.office-top { display:flex; justify-content:space-between; align-items:center; padding:8px 12px 16px; color:#d5e8e1; border-bottom:2px solid #3a5358; margin-bottom:16px; }
+.office-top strong { letter-spacing:.12em; font-size:.8rem; }
+.office-top span { font-size:.75rem; color:#9db9b3; }
+.office-room { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.workstation { position:relative; min-height:220px; padding:14px; border-radius:12px; background:linear-gradient(135deg,#28434a,#20363d); border:1px solid #426066; overflow:hidden; }
+.station-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.station-name { color:#f0faf5; font-weight:800; font-size:1rem; }
+.station-role { color:#9db9b3; font-size:.73rem; margin-top:2px; }
+.state-dot { width:9px; height:9px; display:inline-block; border-radius:50%; margin-right:5px; background:#83969a; }
+.state-dot.running { background:#5ee2a0; box-shadow:0 0 12px #5ee2a0; }
+.state-dot.completed { background:#68b9ff; }
+.state-dot.failed { background:#ff7373; }
+.desk { display:grid; grid-template-columns:66px 1fr; gap:12px; align-items:center; margin:16px 0 10px; }
+.worker { width:60px; height:72px; display:flex; align-items:center; justify-content:center; font-size:2.3rem; background:#15272d; border:1px solid #48636a; border-radius:12px; box-shadow:0 6px 0 #101c20; }
+.monitor { background:#0b151b; border:4px solid #607b7d; border-radius:8px; padding:9px; min-height:58px; box-shadow:0 5px 0 #17252a; }
+.screen-line { height:4px; margin:4px 0; border-radius:4px; background:#4cae91; opacity:.8; }
+.screen-line:nth-child(2) { width:72%; background:#70a9ee; }
+.screen-line:nth-child(3) { width:48%; background:#d6b56f; }
+.task-slip { padding:9px 10px; background:#102128; border-left:3px solid #62d9b1; border-radius:5px; color:#dcece8; font-size:.79rem; line-height:1.4; min-height:48px; overflow-wrap:anywhere; }
+.task-slip.failed { border-left-color:#ff7373; }
+.task-slip.completed { border-left-color:#68b9ff; }
+.task-meta { display:flex; justify-content:space-between; gap:8px; color:#91aaa8; font-size:.68rem; margin-top:8px; }
+.office-corridor { text-align:center; color:#8eaaa5; font-size:.72rem; letter-spacing:.22em; padding:15px 0 4px; }
+.office-legend { display:flex; flex-wrap:wrap; gap:14px; color:#9db9b3; font-size:.75rem; padding:12px 2px 0; }
+@media (max-width:700px) { .office-room { grid-template-columns:1fr; } }
 </style>
 """, unsafe_allow_html=True)
 
@@ -89,35 +115,57 @@ m3.metric("Failed events", failed)
 m4.metric("PRs recorded", pr_count)
 
 if page == "Office Floor":
-    st.subheader("🏢 Office floor")
-    st.caption("Employee-style role cards show the latest task event. Idle means no active run is currently recorded.")
+    st.subheader("🏢 The office")
+    st.caption("Code-rendered floor plan. Each workstation is tied to a real workflow event; agents are marked available when no task is active.")
     latest: dict[str, dict[str, Any]] = {}
     for ev in events:
         name = ev.get("agent_name", "")
         if name and name not in latest:
             latest[name] = ev
-    cols = st.columns(2)
-    labels = {"running":"🟢 Working", "completed":"✅ Completed", "failed":"🔴 Needs attention", "waiting_approval":"🟠 Waiting approval", "idle":"⚪ Available"}
-    for i, agent in enumerate(team):
+    labels = {"running":"Working", "completed":"Task finished", "failed":"Needs attention", "waiting_approval":"Waiting for review", "idle":"Available"}
+    state_classes = {"running":"running", "completed":"completed", "failed":"failed", "waiting_approval":"running", "idle":"idle"}
+    role_to_icon = {"Mira":"🧑🏻‍💼", "Dev":"👩🏽‍💻", "Tara":"🧑🏼‍🔬", "Shield":"🧑🏽‍🔒"}
+    cards = []
+    for agent in team:
         ev = latest.get(agent["name"], {})
-        status = labels.get(ev.get("status", "idle"), "⚪ Available")
-        task = ev.get("task", "Waiting for assignment")
-        stamp = ev.get("created_at", "No activity recorded yet")
-        with cols[i % 2]:
-            st.markdown(f"""<div class="person"><div style="font-size:1.8rem">{agent['emoji']}</div><div class="name">{agent['name']}</div><div class="role">{agent['role']}</div><div class="pill">{status}</div><p style="margin:.7rem 0 .3rem;color:#dbe7f6"><b>Task</b>: {task[:180]}</p><div class="smallmuted">Latest activity: {stamp}</div></div>""", unsafe_allow_html=True)
+        status_key = ev.get("status", "idle")
+        status = labels.get(status_key, "Available")
+        css_status = state_classes.get(status_key, "idle")
+        task = str(ev.get("task", "No task assigned yet"))
+        summary = str(ev.get("summary", "Waiting for the next assignment"))
+        stamp = str(ev.get("created_at", "No activity yet"))
+        def safe(value: str) -> str:
+            return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+        cards.append(f'''
+        <div class="workstation">
+          <div class="station-head">
+            <div><div class="station-name"><span class="state-dot {css_status}"></span>{safe(agent["name"])}</div>
+            <div class="station-role">{safe(agent["role"])}</div></div>
+            <span class="pill">{safe(status)}</span>
+          </div>
+          <div class="desk">
+            <div class="worker">{role_to_icon.get(agent["name"], "🧑‍💻")}</div>
+            <div class="monitor" aria-label="computer monitor">
+              <div class="screen-line"></div><div class="screen-line"></div><div class="screen-line"></div>
+            </div>
+          </div>
+          <div class="task-slip {css_status}"><b>TASK AT THIS DESK</b><br>{safe(task[:230])}<br><span style="color:#8fa9a7">{safe(summary[:150])}</span></div>
+          <div class="task-meta"><span>{safe(status)}</span><span>{safe(stamp[:25])}</span></div>
+        </div>''')
+    st.markdown('<div class="office-shell"><div class="office-top"><strong>FLOOR 01 · ENGINEERING & QUALITY</strong><span>WORKSTATIONS · TASK-DRIVEN</span></div><div class="office-room">' + "".join(cards) + '</div><div class="office-corridor">— MAIN WALKWAY · TEAM HAND-OFF ZONE —</div><div class="office-legend"><span>🟢 Working</span><span>🔵 Completed</span><span>🔴 Needs attention</span><span>⚪ Available / no active task</span></div></div>', unsafe_allow_html=True)
     st.divider()
-    st.subheader("Workflow lane")
+    st.subheader("Task hand-off pipeline")
     stages = [
-        ("1 · Product Manager", "Clarifies scope, assumptions, success criteria and plan."),
-        ("2 · Software Engineer", "Prepares implementation proposal and instructions."),
-        ("3 · QA Engineer", "Defines test cases, expected outcomes and untested areas."),
-        ("4 · Security Reviewer", "Checks risk, secrets, authentication and release controls."),
-        ("5 · GitHub Pull Request", "Creates a proposal on a feature branch for review."),
-        ("6 · Human owner", "Inspects and approves directly on GitHub; no automatic merge or deployment.")]
+        ("01 · Mira / Product", "Reads the requirement and creates scope, assumptions and acceptance criteria."),
+        ("02 · Dev / Engineering", "Uses the plan and writes an implementation proposal."),
+        ("03 · Tara / QA", "Creates test cases and checks the proposal for missing acceptance criteria."),
+        ("04 · Shield / Security", "Reviews security risks, secrets handling and release controls."),
+        ("05 · GitHub Integrator", "Creates a reviewable pull request when explicitly requested in the project room.")
+    ]
     for title, desc in stages:
         st.markdown(f'<div class="taskline"><b>{title}</b><br><span class="smallmuted">{desc}</span></div>', unsafe_allow_html=True)
-    st.info("The dashboard shows operational task summaries and status—not private hidden reasoning. It does not pretend agents are working in the background when no task is running.")
-    if st.button("Refresh activity"):
+    st.info("This floor plan is rendered from HTML/CSS in app.py—no generated images. Status reflects recorded task events; idle seats are not shown as actively working.")
+    if st.button("Refresh office floor"):
         st.rerun()
 
 elif page == "Task Board":
