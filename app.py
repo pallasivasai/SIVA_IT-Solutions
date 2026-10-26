@@ -10,6 +10,7 @@ from agents import build_team, run_agent_step
 from code_builder import CodeBuildError, build_project_files
 from ai_providers import ProviderError, ProviderRouter
 from github_service import GitHubError, GitHubService
+from project_checks import inspect_generated_files
 from storage import EventStore
 
 st.set_page_config(page_title="SIVA IT Solutions · AI Office", page_icon="🏢", layout="wide")
@@ -174,6 +175,12 @@ elif page == "AI Project Room":
                         f"### {path}\\n```\\n{body[:6000]}\\n```"
                         for path, body in list(generated_files.items())[:8]
                     )[:24000]
+                    static_check = inspect_generated_files(generated_files)
+                    outputs["static_qa"] = "\\n".join(
+                        "- " + item["status"] + ": " + item["detail"]
+                        for item in static_check["checks"]
+                    )
+                    outputs["generated_files_context"] += "\\n\\n## Deterministic non-executing checks\\n" + outputs["static_qa"]
                     store.add_event(run_id, "Dev · Code Builder", task, "code_files_generated", "completed", summary=f"Generated {len(generated_files)} reviewable source files")
                     progress.write(f"✅ Generated {len(generated_files)} real source files")
                 except CodeBuildError as exc:
