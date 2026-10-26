@@ -70,17 +70,12 @@ st.markdown("""
 .workbench-agent.active{border-color:#29c7f4;box-shadow:0 0 0 1px #29c7f455,0 8px 22px #0004}
 .workbench-agent.done{border-color:#248d69}.workbench-agent.failed{border-color:#d65757}.workbench-agent.waiting{opacity:.83}
 .wb-top{display:flex;gap:9px;align-items:center}.wb-icon{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:#21384e;border:1px solid #42617c;font-size:23px;flex-shrink:0}
- /* Code-drawn mini character portraits (no generated/static dashboard screenshot). */
-.wb-person{position:relative;width:100%;height:118px;margin:8px 0 10px;border:1px solid #38566b;border-radius:10px;overflow:hidden;background:linear-gradient(180deg,#1c3850 0%,#294b60 72%,#6e8790 72%,#405a66 100%)}
-.wb-person:before{content:"";position:absolute;left:calc(50% - 30px);top:18px;width:60px;height:55px;border-radius:26px 26px 18px 18px;background:var(--shirt,#159aaf);border:2px solid #162b3d;box-shadow:0 2px 0 #8aa4b2}
-.wb-person .wb-head{position:absolute;z-index:2;left:calc(50% - 16px);top:10px;width:32px;height:36px;border:2px solid #243343;border-radius:45% 45% 42% 42%;background:#f3c79e}
-.wb-person .wb-hair{position:absolute;z-index:3;left:calc(50% - 17px);top:7px;width:34px;height:15px;border-radius:17px 17px 5px 5px;background:var(--hair,#2c2630);border:1px solid #202b3b}
-.wb-person .wb-eye{position:absolute;z-index:4;left:calc(50% - 9px);top:24px;width:4px;height:4px;border-radius:50%;background:#1a2934;box-shadow:13px 0 #1a2934}
-.wb-person .wb-smile{position:absolute;z-index:4;left:calc(50% - 5px);top:34px;width:10px;height:4px;border-bottom:2px solid #a64d46;border-radius:50%}
-.wb-person .wb-arm{position:absolute;z-index:3;left:calc(50% - 37px);top:50px;width:25px;height:9px;border-radius:8px;background:#f3c79e;transform:rotate(18deg);box-shadow:49px 0 #f3c79e}
-.wb-person .wb-laptop{position:absolute;z-index:5;left:calc(50% - 23px);bottom:7px;width:46px;height:25px;border:2px solid #b8d7e4;border-radius:4px 4px 1px 1px;background:#15283c;color:#56e2f3;font-size:13px;text-align:center;line-height:21px;box-shadow:0 5px 0 -2px #d4e5e9}
-.wb-person .wb-prop{position:absolute;right:10px;top:10px;font-size:22px;filter:drop-shadow(0 2px 2px #0006)}
-.workbench-agent:nth-child(2) .wb-person{--shirt:#c78c38;--hair:#5b3020}.workbench-agent:nth-child(3) .wb-person{--shirt:#1689c5;--hair:#242733}.workbench-agent:nth-child(4) .wb-person{--shirt:#8c62bd;--hair:#4b2635}.workbench-agent:nth-child(5) .wb-person{--shirt:#526b42;--hair:#2b2422}.workbench-agent:nth-child(6) .wb-person{--shirt:#287b9a;--hair:#292d35}.workbench-agent:nth-child(7) .wb-person{--shirt:#269c78;--hair:#5b3825}.workbench-agent:nth-child(8) .wb-person{--shirt:#bd6844;--hair:#30242a}
+/* Professional, code-rendered vector portraits: consistent lighting, facial features, desk and role accents. */
+.wb-person{position:relative;width:100%;height:150px;margin:8px 0 10px;border:1px solid #38566b;border-radius:12px;overflow:hidden;background:radial-gradient(ellipse at 50% 10%,#31536d 0%,#1b354c 66%,#16283a 100%);box-shadow:inset 0 1px 0 #ffffff12}
+.wb-person svg{display:block;width:100%;height:100%}
+.wb-person .avatar-glow{filter:drop-shadow(0 4px 5px #0005)}
+.wb-person .avatar-screen{font:700 10px Inter,Arial,sans-serif;fill:#70e9f5}
+.wb-person .avatar-prop{font:700 20px Inter,Arial,sans-serif;fill:#eaf5ff}
 
 .wb-name{color:#f2f7ff;font-weight:800;font-size:.95rem}.wb-role{color:#9fb3c9;font-size:.68rem;margin-top:2px}
 .wb-state{display:inline-block;margin:10px 0 7px;border-radius:20px;padding:3px 8px;font-size:.66rem;font-weight:800;background:#27384a;color:#c5d5e7}
@@ -197,6 +192,48 @@ elif page == "AI Project Room":
     st.write("Enter one product goal below. Every specialist's workstation, assigned task and live status stays visible on this page—no need to open Office Floor. The workflow hands each deliverable to the next agent automatically.")
     agent_board_slot = st.empty()
 
+    def agent_avatar_svg(index: int, emoji: str) -> str:
+        # Inline SVG keeps every character crisp and responsive without external image assets.
+        palettes = [
+            ("#16b6c9", "#25324a", "#f2c49a", "#17344b"),
+            ("#d69a45", "#553326", "#e8b58d", "#493a51"),
+            ("#168cc7", "#252a36", "#dca77f", "#233a59"),
+            ("#9870c9", "#492b3e", "#e9bd98", "#3d3a63"),
+            ("#62814f", "#2b2725", "#c9916d", "#2d4b48"),
+            ("#3287a7", "#292d37", "#d6a17c", "#273c5a"),
+            ("#24a47f", "#5b3928", "#e8b68e", "#284b52"),
+            ("#cf7953", "#34242b", "#d99f7a", "#4b3546"),
+        ]
+        shirt, hair, skin, jacket = palettes[(index - 1) % len(palettes)]
+        safe_emoji = html.escape(emoji)
+        return (
+            '<svg viewBox="0 0 300 150" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+            '<defs><linearGradient id="desk' + str(index) + '" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7e9da5"/><stop offset="1" stop-color="#334e60"/></linearGradient>'
+            '<linearGradient id="screen' + str(index) + '" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#203d54"/><stop offset="1" stop-color="#0b1d2d"/></linearGradient></defs>'
+            '<circle cx="150" cy="63" r="53" fill="#ffffff" opacity=".025"/>'
+            '<path d="M0 118 H300 V150 H0Z" fill="url(#desk' + str(index) + ')"/>'
+            '<path d="M0 119 H300" stroke="#a9c6ce" stroke-opacity=".55"/>'
+            '<g class="avatar-glow">'
+            '<path d="M95 117 Q97 78 126 72 L174 72 Q203 78 205 117Z" fill="' + shirt + '" stroke="#102638" stroke-width="3"/>'
+            '<path d="M126 75 L150 94 L174 75" fill="' + jacket + '" stroke="#d3e3eb" stroke-opacity=".25" stroke-width="2"/>'
+            '<path d="M137 59 H163 V78 Q150 89 137 78Z" fill="' + skin + '"/>'
+            '<path d="M119 34 Q120 10 150 10 Q180 10 181 35 L178 59 Q174 76 150 78 Q126 76 122 59Z" fill="' + skin + '" stroke="#342f35" stroke-width="2.5"/>'
+            '<path d="M118 39 Q112 9 145 6 Q179 4 184 28 L181 40 Q171 28 162 23 Q144 34 119 31Z" fill="' + hair + '" stroke="#1a2635" stroke-width="2"/>'
+            '<path d="M127 45 Q133 40 139 45 M161 45 Q167 40 173 45" fill="none" stroke="' + hair + '" stroke-width="3" stroke-linecap="round"/>'
+            '<ellipse cx="135" cy="49" rx="3" ry="4" fill="#172737"/><ellipse cx="165" cy="49" rx="3" ry="4" fill="#172737"/>'
+            '<circle cx="136" cy="48" r="1" fill="#fff"/><circle cx="166" cy="48" r="1" fill="#fff"/>'
+            '<path d="M143 62 Q150 67 157 62" fill="none" stroke="#9d5149" stroke-width="2.5" stroke-linecap="round"/>'
+            '<path d="M106 87 Q89 90 81 103 L105 111 M194 87 Q211 91 219 103 L195 111" fill="none" stroke="' + skin + '" stroke-width="13" stroke-linecap="round"/>'
+            '</g>'
+            '<g><path d="M108 105 L192 105 L198 133 L102 133Z" fill="#d0e2e8" stroke="#162a3b" stroke-width="3"/>'
+            '<rect x="111" y="108" width="78" height="23" rx="3" fill="url(#screen' + str(index) + ')" stroke="#5d8399" stroke-width="1.5"/>'
+            '<text x="150" y="123" text-anchor="middle" class="avatar-screen">SIVA AI</text>'
+            '<path d="M97 135 H203 L193 140 H107Z" fill="#e3edf0" stroke="#627f8b" stroke-width="1.5"/></g>'
+            '<g transform="translate(235 22)"><circle cx="0" cy="0" r="17" fill="#102438" stroke="#4e7187" stroke-width="1.5"/><text x="0" y="7" text-anchor="middle" class="avatar-prop">' + safe_emoji + '</text></g>'
+            '<path d="M22 24 H61 M22 31 H48 M239 72 H272" stroke="#72d8e8" stroke-opacity=".22" stroke-width="2" stroke-linecap="round"/>'
+            '</svg>'
+        )
+
     def draw_project_room_agents(active_run_id: str | None = None) -> None:
         recent = store.recent_events(limit=300)
         run_id_for_board = active_run_id or (
@@ -251,7 +288,7 @@ elif page == "AI Project Room":
             cards.append(
                 f'<div class="workbench-agent {css_state}"><div class="wb-top"><div class="wb-icon">{emoji}</div>'
                 f'<div><div class="wb-name">{index}. {safe_name}</div><div class="wb-role">{role_text}</div></div></div>'
-                f'<div class="wb-person" aria-label="{safe_name} cartoon specialist at workstation"><span class="wb-hair"></span><span class="wb-head"></span><span class="wb-eye"></span><span class="wb-smile"></span><span class="wb-arm"></span><span class="wb-laptop">⌘</span><span class="wb-prop">{emoji}</span></div>'
+                f'<div class="wb-person" role="img" aria-label="{safe_name}, illustrated AI specialist at a workstation">{agent_avatar_svg(index, emoji)}</div>'
                 f'<div class="wb-state">{label}</div><div class="wb-task"><b>Assigned task</b><br>{task_text}</div>'
                 f'<div class="wb-summary">{summary_text}</div><div class="wb-progress"><span style="width:{pct}%"></span></div></div>'
             )
