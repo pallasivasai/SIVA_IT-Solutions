@@ -288,7 +288,7 @@ elif page == "AI Project Room":
                     outputs["sales"] = sales["output"]
                     progress.write("QA + security gates passed. Seller is preparing go-to-market assets.")
                 else:
-                    outputs["sales"] = "BLOCKED: Seller is not allowed to proceed until QA, security, and deterministic source checks explicitly pass.\\n" + "\\n".join(release_gate["reasons"])
+                    outputs["sales"] = "BLOCKED: Seller is not allowed to proceed until QA, security, and deterministic source checks explicitly pass.\n" + "\n".join(release_gate["reasons"])
                     store.add_event(run_id, "Seller", task, "sales_blocked_by_release_gate", "blocked",
                                     summary="; ".join(release_gate["reasons"]))
                     progress.warning("Release gate blocked the product. Seller and GitHub PR actions remain disabled until blockers are fixed.")
