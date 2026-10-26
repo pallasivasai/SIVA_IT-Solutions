@@ -10,6 +10,7 @@ from code_builder import build_project_files
 from github_service import GitHubService
 from market_research import build_research_context
 from project_checks import inspect_generated_files
+from pipeline_gates import evaluate_market_gate, evaluate_release_gate
 from storage import EventStore
 
 
@@ -27,6 +28,13 @@ def main() -> None:
     team = build_team()
     outputs: dict[str, str] = {}
     outputs["market_evidence"] = build_research_context(niche + " customer complaints alternatives underserved users")
+    market_gate = evaluate_market_gate(outputs["market_evidence"])
+    outputs["market_gate"] = market_gate
+    store.add_event(run_id, "Research Gate", goal, "market_gate_checked",
+                    "completed" if market_gate["passed"] else "failed",
+                    summary=f"{market_gate['source_count']} distinct source URLs; passed={market_gate['passed']}")
+    if not market_gate["passed"]:
+        raise RuntimeError(market_gate["reason"])
     dispatch = run_agent_step(router, store, run_id, team[0], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
     outputs["dispatch_plan"] = dispatch["output"]
     assignment = run_agent_step(router, store, run_id, team[1], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
@@ -49,6 +57,13 @@ def main() -> None:
     outputs["static_qa"] = "\n".join("- " + item["status"] + ": " + item["detail"] for item in checks["checks"])
     outputs["qa"] = run_agent_step(router, store, run_id, team[5], project, brief, outputs)["output"]
     outputs["security"] = run_agent_step(router, store, run_id, team[6], project, brief, outputs)["output"]
+    release_gate = evaluate_release_gate(files, checks, outputs["qa"], outputs["security"])
+    outputs["release_gate"] = release_gate
+    store.add_event(run_id, "Final Release Auditor", brief, "release_gate_checked",
+                    "completed" if release_gate["passed"] else "blocked",
+                    summary="; ".join(release_gate["reasons"]) if release_gate["reasons"] else "QA, security and deterministic checks passed")
+    if not release_gate["passed"]:
+        raise RuntimeError("Product release blocked; no Seller hand-off or GitHub PR created. " + "; ".join(release_gate["reasons"]))
     outputs["sales"] = run_agent_step(router, store, run_id, team[7], project, brief, outputs)["output"]
 
     result = {"run_id": run_id, "project": project, "task": brief, "outputs": outputs, "files": files}
