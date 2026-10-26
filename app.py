@@ -70,6 +70,18 @@ st.markdown("""
 .workbench-agent.active{border-color:#29c7f4;box-shadow:0 0 0 1px #29c7f455,0 8px 22px #0004}
 .workbench-agent.done{border-color:#248d69}.workbench-agent.failed{border-color:#d65757}.workbench-agent.waiting{opacity:.83}
 .wb-top{display:flex;gap:9px;align-items:center}.wb-icon{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:#21384e;border:1px solid #42617c;font-size:23px;flex-shrink:0}
+ /* Code-drawn mini character portraits (no generated/static dashboard screenshot). */
+.wb-person{position:relative;width:100%;height:118px;margin:8px 0 10px;border:1px solid #38566b;border-radius:10px;overflow:hidden;background:linear-gradient(180deg,#1c3850 0%,#294b60 72%,#6e8790 72%,#405a66 100%)}
+.wb-person:before{content:"";position:absolute;left:calc(50% - 30px);top:18px;width:60px;height:55px;border-radius:26px 26px 18px 18px;background:var(--shirt,#159aaf);border:2px solid #162b3d;box-shadow:0 2px 0 #8aa4b2}
+.wb-person .wb-head{position:absolute;z-index:2;left:calc(50% - 16px);top:10px;width:32px;height:36px;border:2px solid #243343;border-radius:45% 45% 42% 42%;background:#f3c79e}
+.wb-person .wb-hair{position:absolute;z-index:3;left:calc(50% - 17px);top:7px;width:34px;height:15px;border-radius:17px 17px 5px 5px;background:var(--hair,#2c2630);border:1px solid #202b3b}
+.wb-person .wb-eye{position:absolute;z-index:4;left:calc(50% - 9px);top:24px;width:4px;height:4px;border-radius:50%;background:#1a2934;box-shadow:13px 0 #1a2934}
+.wb-person .wb-smile{position:absolute;z-index:4;left:calc(50% - 5px);top:34px;width:10px;height:4px;border-bottom:2px solid #a64d46;border-radius:50%}
+.wb-person .wb-arm{position:absolute;z-index:3;left:calc(50% - 37px);top:50px;width:25px;height:9px;border-radius:8px;background:#f3c79e;transform:rotate(18deg);box-shadow:49px 0 #f3c79e}
+.wb-person .wb-laptop{position:absolute;z-index:5;left:calc(50% - 23px);bottom:7px;width:46px;height:25px;border:2px solid #b8d7e4;border-radius:4px 4px 1px 1px;background:#15283c;color:#56e2f3;font-size:13px;text-align:center;line-height:21px;box-shadow:0 5px 0 -2px #d4e5e9}
+.wb-person .wb-prop{position:absolute;right:10px;top:10px;font-size:22px;filter:drop-shadow(0 2px 2px #0006)}
+.workbench-agent:nth-child(2) .wb-person{--shirt:#c78c38;--hair:#5b3020}.workbench-agent:nth-child(3) .wb-person{--shirt:#1689c5;--hair:#242733}.workbench-agent:nth-child(4) .wb-person{--shirt:#8c62bd;--hair:#4b2635}.workbench-agent:nth-child(5) .wb-person{--shirt:#526b42;--hair:#2b2422}.workbench-agent:nth-child(6) .wb-person{--shirt:#287b9a;--hair:#292d35}.workbench-agent:nth-child(7) .wb-person{--shirt:#269c78;--hair:#5b3825}.workbench-agent:nth-child(8) .wb-person{--shirt:#bd6844;--hair:#30242a}
+
 .wb-name{color:#f2f7ff;font-weight:800;font-size:.95rem}.wb-role{color:#9fb3c9;font-size:.68rem;margin-top:2px}
 .wb-state{display:inline-block;margin:10px 0 7px;border-radius:20px;padding:3px 8px;font-size:.66rem;font-weight:800;background:#27384a;color:#c5d5e7}
 .workbench-agent.active .wb-state{background:#063e54;color:#65e0ff}.workbench-agent.done .wb-state{background:#103c30;color:#77f0bb}.workbench-agent.failed .wb-state{background:#4a2026;color:#ff9b9b}
@@ -239,6 +251,7 @@ elif page == "AI Project Room":
             cards.append(
                 f'<div class="workbench-agent {css_state}"><div class="wb-top"><div class="wb-icon">{emoji}</div>'
                 f'<div><div class="wb-name">{index}. {safe_name}</div><div class="wb-role">{role_text}</div></div></div>'
+                f'<div class="wb-person" aria-label="{safe_name} cartoon specialist at workstation"><span class="wb-hair"></span><span class="wb-head"></span><span class="wb-eye"></span><span class="wb-smile"></span><span class="wb-arm"></span><span class="wb-laptop">⌘</span><span class="wb-prop">{emoji}</span></div>'
                 f'<div class="wb-state">{label}</div><div class="wb-task"><b>Assigned task</b><br>{task_text}</div>'
                 f'<div class="wb-summary">{summary_text}</div><div class="wb-progress"><span style="width:{pct}%"></span></div></div>'
             )
