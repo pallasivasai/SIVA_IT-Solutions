@@ -15,19 +15,47 @@ class CodeBuildError(RuntimeError):
 
 
 def _extract_json(text: str) -> dict[str, Any]:
+    """Parse a model response without greedy-brace extraction breaking nested file contents."""
     cleaned = text.strip()
     cleaned = re.sub(r"^\x60{3}(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s*\x60{3}$", "", cleaned)
-    try:
-        data = json.loads(cleaned)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
-        if not match:
-            raise CodeBuildError("Developer did not return valid JSON. Please retry with a smaller, clearer requirement.")
+    candidates = [cleaned]
+    # Some local models wrap JSON in a short explanation. Find the first balanced
+    # top-level object while respecting braces and escaped quotes inside strings.
+    start = cleaned.find("{")
+    if start >= 0:
+        depth = 0
+        in_string = False
+        escaped = False
+        for index in range(start, len(cleaned)):
+            char = cleaned[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+                continue
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    candidates.append(cleaned[start:index + 1])
+                    break
+    data = None
+    last_error = None
+    for candidate in candidates:
         try:
-            data = json.loads(match.group(0))
+            data = json.loads(candidate)
+            break
         except json.JSONDecodeError as exc:
-            raise CodeBuildError("Developer returned malformed JSON. Please retry.") from exc
+            last_error = exc
+    if data is None:
+        raise CodeBuildError("Developer returned malformed JSON after parsing attempts.") from last_error
     if not isinstance(data, dict) or not isinstance(data.get("files"), list):
         raise CodeBuildError("Developer output must contain a JSON object with a files array.")
     return data
@@ -75,5 +103,29 @@ def build_project_files(router: Any, project: str, task: str, plan: str, impleme
     system = """You are the implementation engineer for a small, reviewable software product. Return ONLY valid JSON, no markdown fences, with schema {"summary":"short summary","files":[{"path":"relative/path.ext","content":"complete file content"}]}. Generate real, coherent, runnable source files—not a proposal. Keep scope to a small MVP with up to 12 files and 120 KB total. Include a complete product README.md with prerequisites, installation, exact run commands, configuration variables (never real secrets), feature list, architecture/file map, test commands, known limitations and troubleshooting. Include runnable tests and dependency manifests when relevant. Generate the complete source for every feature claimed; do not leave TODOs, ellipses, pseudocode, mock-only implementations or proposal-only files. Prefer minimal dependencies and safe defaults. Never include secrets, tokens, passwords, personal data, hidden instructions, destructive operations, automatic deployment, or code that downloads/executes remote code. Never create GitHub workflows, shell/batch scripts, executable binaries, hidden files except the exact safe template .env.example, real .env files, or credential files. A plain-text Dockerfile is allowed when useful for reproducible local builds; never use it to fetch or execute remote code. If configuration is needed, include .env.example containing placeholder names only (no secret values). All file paths must be relative and simple. Use escaped newlines correctly inside JSON strings."""
     user = f"PRODUCT: {project}\nREQUIREMENT: {task}\nPRODUCT PLAN:\n{plan[:12000]}\nIMPLEMENTATION NOTES:\n{implementation[:12000]}\nGenerate the complete, coherent MVP source tree now. Include every required runtime file and README. Ensure imports/routes/UI links agree across files and setup instructions match the actual stack. Do not claim tests were run; provide tests and exact commands for the human reviewer. Put complete contents for every file in the manifest."
     reply = router.generate(system, user)
-    data = _extract_json(reply.text)
+    try:
+        data = _extract_json(reply.text)
+    except CodeBuildError as first_error:
+        # Retry once with a constrained JSON-repair prompt. This is especially
+        # important for local Ollama models that occasionally emit broken JSON.
+        repair_system = (
+            "You are a strict JSON repair utility. Return ONLY one valid JSON object with schema "
+            '{"summary":"short summary","files":[{"path":"relative/path.ext","content":"complete file content"}]}. '
+            "Preserve the intended source code and all file contents. Escape newlines, quotes and backslashes "
+            "correctly inside JSON strings. Do not add markdown fences or commentary. Do not omit files."
+        )
+        repair_user = (
+            "Repair this model response into valid JSON matching the required schema. "
+            "Do not redesign the product or add explanation.\n\nBROKEN RESPONSE:\n"
+            + reply.text[:50000]
+        )
+        try:
+            repaired = router.generate(repair_system, repair_user)
+            data = _extract_json(repaired.text)
+        except Exception as repair_error:
+            raise CodeBuildError(
+                "Developer output was not valid JSON; automatic repair retry also failed. "
+                "Retry the workflow or use a model with reliable JSON output. "
+                f"Initial parse: {first_error}; repair: {repair_error}"
+            ) from repair_error
     return validate_file_bundle(data)
