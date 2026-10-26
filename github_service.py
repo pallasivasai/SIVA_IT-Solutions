@@ -62,10 +62,10 @@ class GitHubService:
                     raise GitHubError(f"Duplicate generated file path: {product_path}")
                 files[product_path] = body
             files["products/" + product_slug + "/PRODUCT_BRIEF.md"] = (
-                f"# {project}\\n\\n"
-                "## What this product does\\n\\n" + str(outputs.get("product_strategy", "See the parent ai-workflow report.")) +
-                "\\n\\n## Research and customer gap\\n\\n" + str(outputs.get("research", "See the parent ai-workflow report.")) +
-                "\\n\\n## How to run\\n\\nRead README.md in this folder and follow its setup instructions. Review and test before production use.\\n"
+                f"# {project}\n\n"
+                "## What this product does\n\n" + str(outputs.get("product_strategy", "See the parent ai-workflow report.")) +
+                "\n\n## Research and customer gap\n\n" + str(outputs.get("research", "See the parent ai-workflow report.")) +
+                "\n\n## How to run\n\nRead README.md in this folder and follow its setup instructions. Review and test before production use.\n"
             )
         if sum(len(body.encode("utf-8")) for body in files.values()) > 220_000:
             raise GitHubError("Combined PR bundle exceeds the 220 KB safety limit.")
