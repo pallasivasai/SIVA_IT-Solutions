@@ -4,6 +4,7 @@ from typing import Any
 from ai_providers import ProviderRouter
 
 TEAM = [
+    {"name": "Atlas", "role": "Workflow Orchestrator · Assigns and coordinates tasks across all agents", "emoji": "🧭"},
     {"name": "Mira", "role": "Task Assignment Lead · Breaks goals into owned tasks", "emoji": "🗂️"},
     {"name": "Scout", "role": "Market Researcher · Finds customer pain and industry gaps", "emoji": "🔎"},
     {"name": "Nova", "role": "Product Strategist · Turns validated gaps into MVPs", "emoji": "💡"},
@@ -18,6 +19,7 @@ def build_team() -> list[dict[str, str]]:
 
 def build_prompts(agent: dict[str, str], project: str, task: str, context: dict[str, Any]) -> tuple[str, str]:
     role_guidance = {
+        "Atlas": "Act as the operations manager and dispatcher. Assign concrete, non-overlapping tasks to Mira, Scout, Nova, Dev, Tara, Shield and Seller. For each agent specify owner, task, dependency, priority and completion condition. Coordinate hand-offs, identify blockers, and never claim an agent is working unless its task has actually started. Return a concise task dispatch board.",
         "Mira": "Act as task assignment lead. Break the goal into ordered, owned tasks with dependencies, priority and definition of done.",
         "Scout": "Research customer pain points, existing alternatives and underserved users. Separate sourced facts from hypotheses and include evidence/source URLs when available.",
         "Nova": "Turn the best-supported gap into a small useful product. Define target user, MVP scope, differentiator, user journey and measurable acceptance criteria.",
