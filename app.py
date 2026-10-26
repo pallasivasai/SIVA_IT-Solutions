@@ -610,7 +610,16 @@ elif page == "AI Project Room":
                                 run_id, "GitHub Integrator", task, "github_publish_failed", "failed",
                                 summary=outputs["github_publish_error"],
                             )
-                            progress.warning("GitHub publication failed; product files remain available below. Check GitHub token and repository settings.")
+                            if "403" in raw_error or "Resource not accessible by personal access token" in raw_error:
+                                outputs["github_publish_error"] = (
+                                    "GitHub rejected the configured token (HTTP 403). Grant this token access to "
+                                    "pallasivasai/SIVA_IT-Solutions with Contents: Read and write and Pull requests: "
+                                    "Read and write permissions. Then replace GITHUB_TOKEN in Streamlit Cloud → "
+                                    "App settings → Secrets and reboot the app. Never paste the token into chat."
+                                )
+                            else:
+                                outputs["github_publish_error"] = raw_error
+                            progress.error("GitHub PR creation failed. " + outputs["github_publish_error"])
                         progress.write("Lead Research is finding sourced, relevant prospects…")
                         store.add_event(run_id, "Lead Research", task, "agent_started", "running", summary="Searching for sourced buyers relevant to the finished product")
                         draw_project_room_agents(run_id)
