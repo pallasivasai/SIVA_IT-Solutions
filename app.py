@@ -331,6 +331,8 @@ elif page == "AI Project Room":
                     draw_project_room_agents(run_id)
                     progress.write("Scout completed gap research")
                     progress.write("💡 Nova · Project Manager — reviewing Scout's evidence and creating the product plan/task breakdown…")
+                    store.add_event(run_id, "Nova", task, "agent_started", "running", summary="Reviewing Scout's evidence and planning the MVP")
+                    draw_project_room_agents(run_id)
                     strategy = run_agent_step(
                         router, store, run_id, team[1], current_project,
                         task,
@@ -349,6 +351,8 @@ elif page == "AI Project Room":
                         outputs.get("research", "")[:6000]
                     )
                     progress.write("💻 Dev · Software Engineer — accepting Nova's plan and preparing implementation…")
+                    store.add_event(run_id, "Dev", dev_handoff, "agent_started", "running", summary="Translating Nova's plan into an implementation design")
+                    draw_project_room_agents(run_id)
                     implementation = run_agent_step(router, store, run_id, team[2], current_project, dev_handoff, outputs)
                     outputs["implementation"] = implementation["output"]
                     store.add_event(run_id, "Dev", dev_handoff, "implementation_ready", "completed",
@@ -358,8 +362,9 @@ elif page == "AI Project Room":
                     generated_files: dict[str, str] = {}
                     try:
                         progress.write("💻 Dev · Code Builder — generating the actual MVP source files from Nova's plan…")
-                        store.add_event(run_id, "Dev", task, "code_generation_started", "running",
+                        store.add_event(run_id, "Dev · Code Builder", task, "code_generation_started", "running",
                                         summary="Generating actual product source files from the project plan")
+                        draw_project_room_agents(run_id)
                         build_brief = (
                             task + "\n\nPRODUCT STRATEGY / GAP TO FILL:\n" + outputs["product_strategy"] +
                             "\n\nSCOUT RESEARCH / SOURCE EVIDENCE:\n" + outputs["market_evidence"] +
@@ -381,6 +386,8 @@ elif page == "AI Project Room":
                         draw_project_room_agents(run_id)
                         progress.error("Dev could not generate the product source files: " + outputs["code_build_error"])
                     if generated_files:
+                        store.add_event(run_id, "Tara", task, "agent_started", "running", summary="Inspecting generated files against Nova's acceptance criteria")
+                        draw_project_room_agents(run_id)
                         qa = run_agent_step(router, store, run_id, team[3], current_project,
                                             "QA HAND-OFF: inspect the actual generated source files and Nova's acceptance criteria. "
                                             "Run/assess the provided tests where possible, list concrete defects, and do not claim execution without evidence.\n\n" + task,
@@ -388,6 +395,8 @@ elif page == "AI Project Room":
                         outputs["qa"] = qa["output"]
                         draw_project_room_agents(run_id)
                         progress.write("Tara completed the QA report on generated files")
+                        store.add_event(run_id, "Shield", task, "agent_started", "running", summary="Reviewing generated source and QA findings for security risks")
+                        draw_project_room_agents(run_id)
                         security = run_agent_step(router, store, run_id, team[4], current_project,
                                                   "SECURITY HAND-OFF: inspect the actual generated source files, dependencies and QA findings. "
                                                   "Report concrete vulnerabilities and remediation. Do not claim scans were executed unless they were.\n\n" + task,
@@ -414,6 +423,8 @@ elif page == "AI Project Room":
                             "\n\nSTATIC CHECK RESULTS:\n" + outputs.get("static_qa", "")
                         )
                         try:
+                            store.add_event(run_id, "Dev · Remediation", review_feedback, "agent_started", "running", summary="Applying QA and security findings to the product")
+                            draw_project_room_agents(run_id)
                             remediation = run_agent_step(router, store, run_id, team[2], current_project, review_feedback, outputs)
                             outputs["remediation"] = remediation["output"]
                             revised_brief = (
@@ -440,9 +451,13 @@ elif page == "AI Project Room":
                             store.add_event(run_id, "Dev · Remediation", task, "code_remediated", "completed",
                                             summary=f"Regenerated {len(generated_files)} source files from QA/security feedback")
                             progress.write("Revised source generated; Tara and Shield are re-reviewing it…")
+                            store.add_event(run_id, "Tara", task, "agent_started", "running", summary="Re-testing the revised source after remediation")
+                            draw_project_room_agents(run_id)
                             outputs["qa"] = run_agent_step(router, store, run_id, team[3], current_project,
                                                            "RE-REVIEW revised source. Verify previous findings are fixed and identify remaining defects. " + task,
                                                            outputs)["output"]
+                            store.add_event(run_id, "Shield", task, "agent_started", "running", summary="Re-checking security findings after remediation")
+                            draw_project_room_agents(run_id)
                             outputs["security"] = run_agent_step(router, store, run_id, team[4], current_project,
                                                                  "RE-REVIEW revised source. Verify previous security findings are fixed and identify residual risks. " + task,
                                                                  outputs)["output"]
@@ -462,6 +477,8 @@ elif page == "AI Project Room":
                     if release_gate["passed"]:
                         progress.write("Release gate passed. GitHub Integrator is publishing the reviewed product bundle…")
                         try:
+                            store.add_event(run_id, "GitHub Integrator", task, "agent_started", "running", summary="Preparing the reviewed product for a human-reviewable GitHub PR")
+                            draw_project_room_agents(run_id)
                             github_agent = run_agent_step(
                                 router, store, run_id, team[5], current_project,
                                 "Publish the completed product bundle to GitHub as a reviewable pull request. "
@@ -494,12 +511,17 @@ elif page == "AI Project Room":
                             )
                             progress.warning("GitHub publication failed; product files remain available below. Check GitHub token and repository settings.")
                         progress.write("Lead Research is finding sourced, relevant prospects…")
+                        store.add_event(run_id, "Lead Research", task, "agent_started", "running", summary="Searching for sourced buyers relevant to the finished product")
+                        draw_project_room_agents(run_id)
                         outputs["lead_evidence"] = build_research_context(
                             "businesses and companies likely to buy " + current_project + " in India and relevant target markets public company websites contact page"
                         )
                         leads = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
                         outputs["leads"] = leads["output"]
+                        draw_project_room_agents(run_id)
                         progress.write("Lead Research handed sourced prospect findings to Seller.")
+                        store.add_event(run_id, "Seller", task, "agent_started", "running", summary="Drafting tailored outreach and follow-up for sourced prospects")
+                        draw_project_room_agents(run_id)
                         sales = run_agent_step(router, store, run_id, team[7], current_project, task, outputs)
                         outputs["sales"] = sales["output"]
                         progress.write("Seller prepared tailored outreach and a follow-up sequence; no messages were sent.")
