@@ -5,9 +5,9 @@ A Streamlit dashboard for a role-based AI engineering workflow. It displays agen
 ## Included features
 - **Office Floor:** Product Manager, Software Engineer, QA Engineer and Security Reviewer cards.
 - **Task Board:** timestamped activity events and run filtering.
-- **AI Project Room:** submit a requirement and see role-based work reports.
+- **AI Project Room:** submit a requirement and have the Developer agent generate actual source files for a small MVP, preview them, and include them in a GitHub PR.
 - **OpenAI primary + Gemini fallback:** fallback for likely quota/rate-limit/transient failures when Gemini is configured.
-- **GitHub review workflow:** create a dedicated feature branch and PR containing a review artifact. No merge/deployment methods are implemented.
+- **GitHub review workflow:** create a dedicated feature branch and PR containing generated product source files plus role reports. No merge/deployment methods are implemented.
 - **Secret-safe settings:** environment variables or Streamlit Secrets; no API keys in source.
 - **Automated checks:** GitHub Actions runs unit tests for feature branches and PRs.
 
@@ -50,7 +50,7 @@ This app creates reviewable proposals and pull requests only. It does **not** ex
 - This is a user-triggered workflow, not an always-on workforce.
 - The shared-password gate is a basic safety barrier, not enterprise authentication or user-specific authorization.
 - The dashboard visualizes task/event status and concise operational summaries, not hidden chain-of-thought.
-- Initial PR integration packages role reports as Markdown; it does not automatically apply arbitrary multi-file code changes.
+- Generated source is constrained to a small allowlist of text file types and size limits, and is never executed by the Streamlit server. It is committed under `generated-project/` for review; CI currently tests this dashboard's own Python utilities, not every generated product's runtime behavior.
 - Streamlit local SQLite history may not persist across restarts/redeployments. Use managed persistent storage if durable history is needed.
 
 ## Structure
