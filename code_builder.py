@@ -58,7 +58,7 @@ def validate_file_bundle(data: dict[str, Any]) -> dict[str, str]:
         if safe_env_template and re.search(r"(?im)^\s*[A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)[A-Za-z0-9_]*\s*=\s*[^\s#]+", content):
             raise CodeBuildError("The .env.example template must not contain populated secret values.")
         suffix = "." + path.rsplit(".", 1)[-1].lower() if "." in path.rsplit("/", 1)[-1] else ""
-        if suffix not in ALLOWED_SUFFIXES:
+        if suffix not in ALLOWED_SUFFIXES and not safe_env_template:
             raise CodeBuildError(f"File type {suffix or '(none)'} is not allowed for generated projects.")
         if len(content.encode("utf-8")) > MAX_FILE_BYTES:
             raise CodeBuildError(f"File too large: {path[:100]}")
