@@ -26,7 +26,7 @@ pip install -r requirements.txt
 Copy-Item .streamlit/secrets.toml.example .streamlit/secrets.toml
 ```
 
-Edit `.streamlit/secrets.toml` locally and replace placeholders with developer API keys. Never commit that file. Then run:
+Edit `.streamlit/secrets.toml` locally and replace placeholders with developer API keys. Set `APP_PASSWORD` to a strong, unique password before starting the dashboard. Never commit that file. Then run:
 
 ```powershell
 streamlit run app.py
@@ -36,8 +36,9 @@ streamlit run app.py
 1. Go to [Streamlit Community Cloud](https://share.streamlit.io/).
 2. Select `pallasivasai/SIVA_IT-Solutions`, branch `feat/ai-company-control-center`, and main file `app.py`.
 3. In app Settings → Secrets, add the configuration keys with real values. Never put keys in source code or chat.
-4. GitHub PR integration needs a fine-grained token with only required Contents and Pull Requests permissions. Store it as `GITHUB_TOKEN`.
-5. Before sharing the dashboard publicly, configure access control if private work will be handled.
+4. Set a strong unique `APP_PASSWORD` in Streamlit Secrets; the app locks itself when it is missing or left at the placeholder value.
+5. GitHub PR integration needs a fine-grained token with only required Contents and Pull Requests permissions. Store it as `GITHUB_TOKEN`.
+6. Do not share the dashboard password casually. For a real company workflow, prefer a proper identity provider / SSO and user-specific audit trails.
 
 ## Provider fallback behaviour
 OpenAI is tried first. Gemini is used when OpenAI is not configured or a likely quota, rate-limit or transient-provider failure occurs. Authentication/model configuration failures are reported instead of being silently masked. If both providers fail or exhaust their limits, the task reports an error. API billing is separate from a ChatGPT subscription; Gemini free access has quotas and is not guaranteed unlimited.
@@ -47,6 +48,7 @@ This app creates reviewable proposals and pull requests only. It does **not** ex
 
 ## Honest limitations
 - This is a user-triggered workflow, not an always-on workforce.
+- The shared-password gate is a basic safety barrier, not enterprise authentication or user-specific authorization.
 - The dashboard visualizes task/event status and concise operational summaries, not hidden chain-of-thought.
 - Initial PR integration packages role reports as Markdown; it does not automatically apply arbitrary multi-file code changes.
 - Streamlit local SQLite history may not persist across restarts/redeployments. Use managed persistent storage if durable history is needed.
