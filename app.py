@@ -123,7 +123,7 @@ if page == "Office Floor":
         name = canonical_agent_name(str(ev.get("agent_name", "")))
         if name and name not in latest:
             latest[name] = ev
-    labels = {"running": ("WORKING", "running"), "completed": ("DONE", "done"), "failed": ("ERROR", "failed"), "waiting_approval": ("WAITING FOR REVIEW", "waiting"), "idle": ("IDLE", "idle"), "code_files_generated": ("DONE", "done"), "agent_started": ("WORKING", "running"), "agent_completed": ("DONE", "done"), "agent_failed": ("ERROR", "failed")}
+    labels = {"running": ("WORKING", "running"), "completed": ("DONE", "done"), "failed": ("ERROR", "failed"), "waiting_approval": ("WAITING FOR REVIEW", "waiting"), "idle": ("IDLE", "idle"), "code_files_generated": ("DONE", "done"), "agent_started": ("WORKING", "running"), "agent_completed": ("DONE", "done"), "agent_failed": ("ERROR", "failed"), "agent_queued": ("WAITING", "waiting")}
     stations = []
     for agent in team:
         ev = latest.get(agent["name"], {})
@@ -185,6 +185,24 @@ elif page == "AI Project Room":
             st.session_state.selected_project = current_project
             outputs: dict[str, Any] = {}
             progress = st.status("Starting task workflow…", expanded=True)
+            # Queue every specialist up front so a failed hand-off never leaves
+            # downstream stations misleadingly showing IDLE.
+            queued_tasks = {
+                "Scout": "Search public web sources and identify customer pain and market gaps",
+                "Nova": "Review Scout evidence; create product plan and split specialist tasks",
+                "Dev": "Build actual product files from Nova's plan",
+                "Tara": "Test generated product against acceptance criteria",
+                "Shield": "Review source and QA findings for security risks",
+                "GitHub Integrator": "Publish reviewed product as a feature branch and PR after gates pass",
+                "Lead Research": "Find sourced buyers after release readiness",
+                "Seller": "Prepare tailored outreach and follow-up from verified leads",
+            }
+            for queued_agent in team:
+                store.add_event(
+                    run_id, queued_agent["name"], queued_tasks.get(queued_agent["name"], "Waiting for hand-off"),
+                    "agent_queued", "waiting",
+                    summary="Queued; waiting for required upstream hand-off and gates.",
+                )
             try:
                 # Record Scout as the current owner before external research starts so the
                 # Virtual Office shows the real active task even if web search fails.
@@ -374,14 +392,27 @@ elif page == "AI Project Room":
                         expanded=not release_gate["passed"],
                     )
             except ProviderError as exc:
-                store.add_event(run_id, "System", task, "workflow_failed", "failed", summary=str(exc))
-                progress.update(label="Workflow stopped", state="error", expanded=True)
-                st.error(str(exc))
+                error_text = f"{type(exc).__name__}: {exc}"
+                store.add_event(run_id, "System", task, "workflow_failed", "failed", summary=error_text)
+                st.session_state.last_run = {
+                    "run_id": run_id, "project": current_project, "task": task,
+                    "outputs": {**outputs, "workflow_error": error_text},
+                    "files": locals().get("generated_files", {}), "base_branch": base_branch,
+                }
+                progress.update(label="Workflow stopped — provider error", state="error", expanded=True)
+                st.error("Workflow stopped at the last recorded agent. " + error_text)
+                st.info("Office Floor will show completed agents as DONE, the failing agent as ERROR, and downstream agents as WAITING.")
             except Exception as exc:
-                store.add_event(run_id, "System", task, "workflow_failed", "failed", summary=f"{type(exc).__name__}: {exc}")
-                progress.update(label="Workflow stopped", state="error", expanded=True)
-                st.error(f"Workflow stopped: {type(exc).__name__}: {exc}")
-                st.caption("Open Office Floor or Task Board to inspect which agent last ran and the recorded task.")
+                error_text = f"{type(exc).__name__}: {exc}"
+                store.add_event(run_id, "System", task, "workflow_failed", "failed", summary=error_text)
+                st.session_state.last_run = {
+                    "run_id": run_id, "project": current_project, "task": task,
+                    "outputs": {**outputs, "workflow_error": error_text},
+                    "files": locals().get("generated_files", {}), "base_branch": base_branch,
+                }
+                progress.update(label="Workflow stopped — see recorded error", state="error", expanded=True)
+                st.error("Workflow stopped: " + error_text)
+                st.info("Office Floor will show completed agents as DONE, the failing agent as ERROR, and downstream agents as WAITING.")
     result = st.session_state.last_run
     if result:
         st.markdown(f"### Latest run · {result['project']}")
