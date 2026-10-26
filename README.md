@@ -75,3 +75,14 @@ The `orchestration.py` module defines 25 specialist role contracts, a dependency
 The interactive workflow currently runs the established eight-agent pipeline (Atlas, Mira, Scout, Nova, Dev, Tara, Shield, Seller). It now includes one bounded remediation pass: Dev receives QA/security findings, regenerates the product source tree, and Tara/Shield re-review it. This is not yet a fully parallel 25-worker or 24/7 system; the additional roles and dependency graph are foundational architecture.
 
 A generated source bundle is not proof of a working product. The app does not execute generated code in a sandbox, so reports must disclose tests actually run versus proposed/not-run. GitHub branch push/PR creation remains gated by configured credentials and owner approval; merges and deployments are not automated.
+
+
+## Run locally with Ollama (local-first mode)
+
+1. Install Ollama from https://ollama.com/ and start its service.
+2. Pull a model that fits your computer, for example `ollama pull qwen2.5:7b`.
+3. Create a Python virtual environment, then run `pip install -r requirements.txt`.
+4. Set `AI_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://127.0.0.1:11434`, and `OLLAMA_MODEL=qwen2.5:7b` in your local shell.
+5. Run `streamlit run app.py`.
+
+In Windows PowerShell, run `$env:AI_PROVIDER="ollama"`, `$env:OLLAMA_BASE_URL="http://127.0.0.1:11434"`, and `$env:OLLAMA_MODEL="qwen2.5:7b"` before starting Streamlit. Explicit `AI_PROVIDER=ollama` forces local-only inference: if Ollama is unavailable, the app reports an error and does not silently call cloud providers. The hosted Streamlit app cannot reach Ollama running on your personal computer at `127.0.0.1`; run the app locally to use local Ollama. Model performance and memory needs depend on the model and your hardware.
