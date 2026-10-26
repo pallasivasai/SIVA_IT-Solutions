@@ -33,13 +33,27 @@ def build_prompts(agent: dict[str, str], project: str, task: str, context: dict[
     user = f"USER REQUIREMENT:\n{task}\n\nPREVIOUS ROLE HAND-OFFS:\n{prior}\n\nReturn an operational report with headings: ## Work summary, ## Deliverable, ## Risks / assumptions, ## Next hand-off. Make it specific and actionable. For broad tasks, recommend a safe incremental MVP."
     return system, user
 
+def assigned_task_for(agent: dict[str, str], overall_goal: str) -> str:
+    assignments = {
+        "Atlas": "Create the dispatch board: identify deliverables, assign one clear owner per workstream, set dependencies and completion criteria, and flag blockers.",
+        "Mira": "Translate the overall goal into ordered tasks with owners, priorities, dependencies, and acceptance criteria. Check Atlas's dispatch and resolve ownership gaps.",
+        "Scout": "Research the target users, pain points, alternatives, competitor complaints and unmet needs. Separate sourced evidence from assumptions and cite available URLs.",
+        "Nova": "Use the goal and research to choose one focused MVP, define user journey, scope, differentiator, measurable acceptance criteria and explicit non-goals.",
+        "Dev": "Produce the implementation plan and actual source files for the agreed MVP. Include setup/run instructions and safe defaults; do not claim execution or tests that did not happen.",
+        "Tara": "Review the generated source and requirements for correctness. Create concrete tests, edge cases and expected outcomes; report checks as proposed or actually run.",
+        "Shield": "Review source and workflow for secrets, unsafe execution, authentication, input validation, dependencies, permissions and deployment risks. Give actionable fixes.",
+        "Seller": "Prepare buyer persona, positioning, value proposition, pricing hypotheses, launch copy, ethical outreach draft and success metrics. Do not contact anyone or spend money.",
+    }
+    return f"OVERALL GOAL:\n{overall_goal}\n\nYOUR OWNED TASK ({agent['name']}):\n{assignments.get(agent['name'], 'Complete your role-specific deliverable and hand it to the next owner.')}"
+
 def run_agent_step(router: ProviderRouter, store: Any, run_id: str, agent: dict[str, str], project: str, task: str, context: dict[str, Any]) -> dict[str, str]:
-    store.add_event(run_id, agent["name"], task, "agent_started", "running", summary=f"{agent['role']} started")
+    assigned_task = assigned_task_for(agent, task)
+    store.add_event(run_id, agent["name"], assigned_task, "agent_started", "running", summary=f"{agent['role']} started")
     try:
-        system, user = build_prompts(agent, project, task, context)
+        system, user = build_prompts(agent, project, assigned_task, context)
         reply = router.generate(system, user)
-        store.add_event(run_id, agent["name"], task, "agent_completed", "completed", summary=f"{agent['role']} completed the hand-off", provider=reply.provider, model=reply.model)
+        store.add_event(run_id, agent["name"], assigned_task, "agent_completed", "completed", summary=f"{agent['role']} completed the hand-off", provider=reply.provider, model=reply.model)
         return {"output": reply.text, "provider": reply.provider, "model": reply.model}
     except Exception as exc:
-        store.add_event(run_id, agent["name"], task, "agent_failed", "failed", summary=f"{type(exc).__name__}: {exc}")
+        store.add_event(run_id, agent["name"], assigned_task, "agent_failed", "failed", summary=f"{type(exc).__name__}: {exc}")
         raise
