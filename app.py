@@ -122,10 +122,11 @@ if page == "Office Floor":
         ev = latest.get(agent["name"], {})
         status, css_status = labels.get(ev.get("status", "idle"), ("IDLE", "idle"))
         task = html.escape(str(ev.get("task", "Waiting for workflow hand-off"))[:105])
+        summary = html.escape(str(ev.get("summary", "No activity recorded for this agent yet"))[:180])
         name = html.escape(str(agent["name"]))
         role = html.escape(str(agent["role"].split("·")[0].strip()))
         emoji = html.escape(str(agent.get("emoji", "🤖")))
-        stations.append('<div class="agent-station"><div class="agent-sprite">' + emoji + '</div><div class="agent-desk"></div><div class="agent-name">' + name + '</div><div class="agent-role">' + role + '</div><div class="agent-status ' + css_status + '">' + status + '</div><div style="margin-top:5px;text-align:center;color:#3c5b5b;font-size:.65rem">' + task + '</div></div>')
+        stations.append('<div class="agent-station"><div class="agent-sprite">' + emoji + '</div><div class="agent-desk"></div><div class="agent-name">' + name + '</div><div class="agent-role">' + role + '</div><div class="agent-status ' + css_status + '">' + status + '</div><div style="margin-top:5px;text-align:center;color:#3c5b5b;font-size:.65rem">' + task + '</div><div style="margin-top:5px;text-align:center;color:#243f45;font-size:.62rem;line-height:1.35">' + summary + '</div></div>')
     office_html = '<div class="office-shell"><div class="office-top"><span>▦ SIVA IT SOLUTIONS · FLOOR 01</span><span>7 SPECIALIST WORKSTATIONS · AUTO-REFRESH 5s</span></div><div class="office-floor">' + "".join(stations) + '</div><div class="office-bottom"><span>● VIEW OF RECORDED EVENTS</span><span>Human approval required · No auto-merge/deploy</span></div></div>'
     st.markdown(office_html, unsafe_allow_html=True)
     st.divider()
