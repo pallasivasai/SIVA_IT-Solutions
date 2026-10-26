@@ -11,6 +11,7 @@ from code_builder import CodeBuildError, build_project_files
 from ai_providers import ProviderError, ProviderRouter
 from github_service import GitHubError, GitHubService
 from project_checks import inspect_generated_files
+from market_research import build_research_context
 from storage import EventStore
 
 st.set_page_config(page_title="SIVA IT Solutions · AI Office", page_icon="🏢", layout="wide")
@@ -141,7 +142,7 @@ elif page == "Task Board":
 
 elif page == "AI Project Room":
     st.subheader("🧩 Assign a task to the AI team")
-    st.write("Mira plans the product, Dev generates real source files, Tara reviews test coverage and Shield reviews security. The files are packaged into a reviewable GitHub PR; generated code is never executed by this dashboard.")
+    st.write("Mira assigns tasks → Scout researches industry gaps → Nova designs a product to fill a gap → Dev builds source files → Tara checks quality → Shield reviews security → Seller prepares a sales plan. The files are packaged into a reviewable GitHub PR; generated code is never executed by this dashboard.")
     with st.form("task_form"):
         project = st.text_input("Project name", value=st.session_state.selected_project)
         task = st.text_area("Requirement", height=170, placeholder="Describe the feature, constraints, acceptance criteria and what must not change.")
@@ -159,40 +160,45 @@ elif page == "AI Project Room":
             outputs: dict[str, Any] = {}
             progress = st.status("Starting task workflow…", expanded=True)
             try:
-                plan = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
-                outputs["plan"] = plan["output"]
-                progress.write(f"✅ Mira completed the plan · {plan['provider']}")
-                implementation = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
+                assignment = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
+                outputs["assignment"] = assignment["output"]
+                progress.write("Mira assigned the work")
+                progress.write("Scout is collecting public market evidence…")
+                outputs["market_evidence"] = build_research_context(task)
+                scout = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
+                outputs["research"] = scout["output"]
+                progress.write("Scout completed gap research")
+                strategy = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
+                outputs["product_strategy"] = strategy["output"]
+                progress.write("Nova selected an MVP direction")
+                implementation = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
                 outputs["implementation"] = implementation["output"]
-                progress.write(f"✅ Dev prepared implementation notes · {implementation['provider']}")
+                progress.write("Dev prepared implementation notes")
                 generated_files: dict[str, str] = {}
                 try:
-                    progress.write("💻 Dev is generating actual product source files…")
-                    generated_files = build_project_files(router, current_project, task, outputs["plan"], outputs["implementation"])
-                    outputs["generated_files_summary"] = "\\n".join(f"- {path}" for path in generated_files)
-                    # Give QA and Security actual source excerpts to review, not just filenames.
-                    outputs["generated_files_context"] = "\\n\\n".join(
-                        f"### {path}\\n```\\n{body[:6000]}\\n```"
-                        for path, body in list(generated_files.items())[:8]
-                    )[:24000]
+                    progress.write("Dev is generating actual product source files…")
+                    build_brief = task + "\n\nPRODUCT STRATEGY / GAP TO FILL:\n" + outputs["product_strategy"] + "\n\nMARKET EVIDENCE:\n" + outputs["market_evidence"]
+                    generated_files = build_project_files(router, current_project, build_brief, outputs["product_strategy"], outputs["implementation"])
+                    outputs["generated_files_summary"] = "\n".join(f"- {path}" for path in generated_files)
+                    outputs["generated_files_context"] = "\n\n".join(f"### {path}\n{body[:6000]}" for path, body in list(generated_files.items())[:8])[:24000]
                     static_check = inspect_generated_files(generated_files)
-                    outputs["static_qa"] = "\\n".join(
-                        "- " + item["status"] + ": " + item["detail"]
-                        for item in static_check["checks"]
-                    )
-                    outputs["generated_files_context"] += "\\n\\n## Deterministic non-executing checks\\n" + outputs["static_qa"]
+                    outputs["static_qa"] = "\n".join("- " + item["status"] + ": " + item["detail"] for item in static_check["checks"])
+                    outputs["generated_files_context"] += "\n\n## Deterministic non-executing checks\n" + outputs["static_qa"]
                     store.add_event(run_id, "Dev · Code Builder", task, "code_files_generated", "completed", summary=f"Generated {len(generated_files)} reviewable source files")
-                    progress.write(f"✅ Generated {len(generated_files)} real source files")
+                    progress.write(f"Generated {len(generated_files)} real source files")
                 except CodeBuildError as exc:
                     outputs["code_build_error"] = str(exc)
                     store.add_event(run_id, "Dev · Code Builder", task, "code_generation_failed", "failed", summary=str(exc))
-                    progress.write(f"⚠️ Code generation needs retry: {exc}")
-                qa = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
+                    progress.write(f"Code generation needs retry: {exc}")
+                qa = run_agent_step(router, store, run_id, team[4], current_project, task, outputs)
                 outputs["qa"] = qa["output"]
-                progress.write(f"✅ Tara completed the QA report · {qa['provider']}")
-                security = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
+                progress.write("Tara completed the QA report")
+                security = run_agent_step(router, store, run_id, team[5], current_project, task, outputs)
                 outputs["security"] = security["output"]
-                progress.write(f"✅ Shield completed the security review · {security['provider']}")
+                progress.write("Shield completed the security review")
+                sales = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
+                outputs["sales"] = sales["output"]
+                progress.write("Seller prepared go-to-market assets")
                 st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
                 progress.update(label="Workflow completed", state="complete", expanded=False)
             except ProviderError as exc:
@@ -207,7 +213,7 @@ elif page == "AI Project Room":
     if result:
         st.markdown(f"### Latest run · {result['project']}")
         st.caption(f"Run ID: {result['run_id']}")
-        for label, key in [("🧭 Product plan","plan"),("💻 Implementation proposal","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security")]:
+        for label, key in [("🗂️ Task assignments","assignment"),("🔎 Industry gap research","research"),("💡 Product strategy","product_strategy"),("💻 Implementation proposal","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security"),("📈 Sales and go-to-market plan","sales")]:
             with st.expander(label, expanded=(key == "plan")):
                 st.markdown(result["outputs"].get(key, "No report available."))
         if result.get("code_build_error"):
