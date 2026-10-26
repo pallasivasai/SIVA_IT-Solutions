@@ -12,6 +12,7 @@ from ai_providers import ProviderError, ProviderRouter
 from github_service import GitHubError, GitHubService
 from project_checks import inspect_generated_files
 from market_research import build_research_context
+from pipeline_gates import evaluate_market_gate, evaluate_release_gate
 from storage import EventStore
 
 st.set_page_config(page_title="SIVA IT Solutions · AI Office", page_icon="🏢", layout="wide")
@@ -185,6 +186,14 @@ elif page == "AI Project Room":
                 progress.write("Mira refined task ownership")
                 progress.write("Scout is collecting public market evidence…")
                 outputs["market_evidence"] = build_research_context(task)
+                market_gate = evaluate_market_gate(outputs["market_evidence"])
+                outputs["market_gate"] = market_gate
+                store.add_event(run_id, "Research Gate", task, "market_gate_checked",
+                                "completed" if market_gate["passed"] else "failed",
+                                summary=f"{market_gate['source_count']} distinct source URLs; passed={market_gate['passed']}")
+                if not market_gate["passed"]:
+                    raise RuntimeError(market_gate["reason"])
+                progress.write(f"Research gate passed with {market_gate['source_count']} distinct source URLs")
                 scout = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
                 outputs["research"] = scout["output"]
                 progress.write("Scout completed gap research")
@@ -265,9 +274,24 @@ elif page == "AI Project Room":
                         outputs["remediation_error"] = str(exc)
                         store.add_event(run_id, "Dev · Remediation", task, "remediation_failed", "failed", summary=str(exc))
                         progress.warning(f"Remediation pass did not produce revised source: {exc}")
-                sales = run_agent_step(router, store, run_id, team[7], current_project, task, outputs)
-                outputs["sales"] = sales["output"]
-                progress.write("Seller prepared optional go-to-market assets (not product source code)")
+                final_static_checks = inspect_generated_files(generated_files) if generated_files else {"passed": False, "failures": 1, "warnings": 0, "checks": []}
+                outputs["final_static_checks"] = final_static_checks
+                release_gate = evaluate_release_gate(
+                    generated_files, final_static_checks, outputs.get("qa", ""), outputs.get("security", "")
+                )
+                outputs["release_gate"] = release_gate
+                store.add_event(run_id, "Final Release Auditor", task, "release_gate_checked",
+                                "completed" if release_gate["passed"] else "blocked",
+                                summary="; ".join(release_gate["reasons"]) if release_gate["reasons"] else "QA, security and deterministic checks passed")
+                if release_gate["passed"]:
+                    sales = run_agent_step(router, store, run_id, team[7], current_project, task, outputs)
+                    outputs["sales"] = sales["output"]
+                    progress.write("QA + security gates passed. Seller is preparing go-to-market assets.")
+                else:
+                    outputs["sales"] = "BLOCKED: Seller is not allowed to proceed until QA, security, and deterministic source checks explicitly pass.\\n" + "\\n".join(release_gate["reasons"])
+                    store.add_event(run_id, "Seller", task, "sales_blocked_by_release_gate", "blocked",
+                                    summary="; ".join(release_gate["reasons"]))
+                    progress.warning("Release gate blocked the product. Seller and GitHub PR actions remain disabled until blockers are fixed.")
                 st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
                 progress.update(label="Workflow completed", state="complete", expanded=False)
             except ProviderError as exc:
@@ -296,7 +320,12 @@ elif page == "AI Project Room":
         else:
             st.info("No source files are available yet. Re-run with a smaller, specific MVP requirement to generate a product.")
         st.warning("Generated files are reviewed as a GitHub PR. This app does not execute generated code, merge PRs, or deploy products automatically.")
-        if st.button("Create feature branch + GitHub Pull Request", type="primary", key=f"pr_{result['run_id']}", disabled=not PASSWORD_CONFIGURED or not generated_files):
+        release_ready = bool(result.get("outputs", {}).get("release_gate", {}).get("passed"))
+        if not release_ready:
+            st.error("Release blocked: QA, security, and deterministic checks must all pass before a product PR can be created.")
+            for reason in result.get("outputs", {}).get("release_gate", {}).get("reasons", []):
+                st.write("• " + reason)
+        if st.button("Create feature branch + GitHub Pull Request", type="primary", key=f"pr_{result['run_id']}", disabled=not PASSWORD_CONFIGURED or not generated_files or not release_ready):
             try:
                 gh = GitHubService()
                 bundle = gh.generate_file_bundle(result)
