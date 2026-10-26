@@ -168,3 +168,38 @@ def test_market_gate_counts_actual_source_urls():
     result = evaluate_market_gate("\n".join(["https://example.com/a", "https://example.org/b"]))
     assert result["passed"]
     assert result["source_count"] == 2
+
+
+
+def test_code_builder_allows_safe_env_example_template():
+    from code_builder import validate_file_bundle
+
+    files = validate_file_bundle({
+        "files": [
+            {"path": "README.md", "content": "# Demo"},
+            {"path": ".env.example", "content": "API_BASE_URL=https://example.invalid\nAPI_KEY=\n"},
+        ]
+    })
+    assert "generated-project/.env.example" in files
+
+
+def test_code_builder_rejects_populated_secret_in_env_example():
+    import pytest
+    from code_builder import CodeBuildError, validate_file_bundle
+
+    with pytest.raises(CodeBuildError, match="must not contain populated secret"):
+        validate_file_bundle({
+            "files": [
+                {"path": ".env.example", "content": "API_KEY=sk_live_real-looking-value\n"}
+            ]
+        })
+
+
+def test_code_builder_rejects_real_env_file():
+    import pytest
+    from code_builder import CodeBuildError, validate_file_bundle
+
+    with pytest.raises(CodeBuildError, match="Protected path rejected"):
+        validate_file_bundle({
+            "files": [{"path": ".env", "content": "API_KEY=placeholder"}]
+        })
