@@ -41,7 +41,7 @@ streamlit run app.py
 6. Do not share the dashboard password casually. For a real company workflow, prefer a proper identity provider / SSO and user-specific audit trails.
 
 ## Provider fallback behaviour
-OpenAI is tried first. Gemini is used when OpenAI is not configured or a likely quota, rate-limit or transient-provider failure occurs. Authentication/model configuration failures are reported instead of being silently masked. If both providers fail or exhaust their limits, the task reports an error. API billing is separate from a ChatGPT subscription; Gemini free access has quotas and is not guaranteed unlimited.
+OpenAI is tried first. Gemini Flash-Lite (`gemini-3.5-flash-lite`) is the default low-cost fallback when OpenAI is not configured or a likely quota, rate-limit or transient-provider failure occurs. Free-tier access and quotas depend on Google's current account/model eligibility. Authentication/model configuration failures are reported instead of being silently masked. If both providers fail or exhaust their limits, the task reports an error. API billing is separate from a ChatGPT subscription; Gemini free access has quotas and is not guaranteed unlimited.
 
 ## Human approval boundary
 This app creates reviewable proposals and pull requests only. It does **not** execute model-generated code, merge pull requests or deploy to production. Configure branch protection on `main` and require PR review and passing checks where available.
