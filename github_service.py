@@ -81,7 +81,7 @@ class GitHubService:
         self.repository.create_git_ref(ref=f"refs/heads/{branch_name}", sha=base.commit.sha)
         for path, body in files.items():
             self.repository.create_file(path=path, message=f"docs: add AI proposal for {project_name}", content=body, branch=branch_name)
-        pr = self.repository.create_pull(title=f"AI proposal: {project_name[:100]}", body=f"""## Summary\nRole-based AI workflow proposal for human review.\n\n## Original requirement\n{task[:4000]}\n\n## Review checklist\n- [ ] Inspect proposed changes\n- [ ] Check acceptance criteria and tests\n- [ ] Review security and secrets\n- [ ] Approve explicitly before merge\n\n**Safety:** This app does not merge PRs, run generated code, or deploy production.\n""", head=branch_name, base=base_branch, draft=False)
+        pr = self.repository.create_pull(title=f"AI proposal: {project_name[:100]}", body=f"""## Summary\nComplete AI-generated product source bundle plus research, QA, security and go-to-market reports for human review.\n\n## Original requirement\n{task[:4000]}\n\n## Review checklist\n- [ ] Inspect proposed changes\n- [ ] Check acceptance criteria and tests\n- [ ] Review security and secrets\n- [ ] Approve explicitly before merge\n\n**Safety:** This app does not merge PRs, run generated code, or deploy production.\n""", head=branch_name, base=base_branch, draft=False)
         return {"number": pr.number, "url": pr.html_url, "branch": branch_name}
 
     def list_open_prs(self, owner: str, repo: str) -> list[dict[str, Any]]:
