@@ -28,7 +28,7 @@ class ProviderRouter:
         self.openai_key = get_setting("OPENAI_API_KEY")
         self.openai_model = get_setting("OPENAI_MODEL", "gpt-4.1-mini")
         self.gemini_key = get_setting("GEMINI_API_KEY")
-        self.gemini_model = get_setting("GEMINI_MODEL", "gemini-2.5-flash")
+        self.gemini_model = get_setting("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
     @staticmethod
     def fallback_worthy(exc: Exception) -> bool:
