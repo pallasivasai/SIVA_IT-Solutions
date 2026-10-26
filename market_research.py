@@ -82,39 +82,49 @@ def search_market_evidence(query: str, limit: int = 6) -> list[dict[str, str]]:
     }]
 
 
-def build_research_context(query: str) -> str:
+def collect_market_research(query: str, limit: int = 5) -> dict[str, Any]:
+    """Collect live public web evidence for Scout; this is not tied to ResearchGate."""
+    clean_query = " ".join((query or "").split())[:1200]
     searches = [
-        query + " customer pain points alternatives reviews",
-        query + " competitors pricing product gaps",
-        query + " underserved users complaints workflow",
+        clean_query + " customer complaints problems unmet needs reviews",
+        clean_query + " existing tools competitors pricing limitations",
+        clean_query + " Reddit forum discussions workflow pain points alternatives",
+        clean_query + " market trends underserved customers",
     ]
     gathered: list[dict[str, str]] = []
     seen: set[str] = set()
-    errors: list[str] = []
+    diagnostics: list[str] = []
     for term in searches:
-        for item in search_market_evidence(term, 5):
+        for item in search_market_evidence(term, limit):
             url = item.get("url", "").strip()
             if not url:
                 if item.get("snippet"):
-                    errors.append(item["snippet"])
+                    diagnostics.append(item["snippet"])
                 continue
             if url not in seen:
                 seen.add(url)
                 gathered.append(item)
-        # Stop early when enough diverse sources have been collected.
-        if len(gathered) >= 10:
+        if len(gathered) >= 12:
             break
-
     lines = [
-        "Public web research results (live search snippets are leads, not independently verified claims):",
-        f"Distinct public URLs collected: {len(seen)}",
+        "LIVE PUBLIC WEB RESEARCH — no ResearchGate dependency.",
+        "Search uses public web search (DDGS with Bing RSS fallback); the configured AI model analyses the returned evidence.",
+        f"User goal/query: {clean_query}",
+        f"Distinct public URLs collected: {len(gathered)}",
+        "Scout must identify customer pain, competitor alternatives and weaknesses, underserved users, and evidence-backed gaps. Separate evidence from hypotheses.",
     ]
-    for item in gathered[:15]:
+    for item in gathered[:20]:
         lines.append(f"- {item['title']}\n  URL: {item['url']}\n  Snippet: {item['snippet']}")
-    if errors:
-        lines.append("\nLIVE SEARCH DIAGNOSTICS:")
-        for error in dict.fromkeys(errors):
-            lines.append("- " + error)
+    if diagnostics:
+        lines.append("\nSEARCH DIAGNOSTICS:")
+        lines.extend("- " + d for d in dict.fromkeys(diagnostics))
     if not gathered:
-        lines.append("No verifiable search results returned. Do not invent citations; label market observations as hypotheses.")
-    return "\n".join(lines)
+        lines.append("No verifiable public results returned. Do not invent sources or claim research completed.")
+    return {"query": clean_query, "results": gathered[:20],
+            "source_urls": [item["url"] for item in gathered[:20]],
+            "diagnostics": list(dict.fromkeys(diagnostics)), "context": "\n".join(lines)}
+
+
+def build_research_context(query: str) -> str:
+    """Compatibility wrapper for existing workflows."""
+    return str(collect_market_research(query)["context"])
