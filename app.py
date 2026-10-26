@@ -169,6 +169,11 @@ elif page == "AI Project Room":
                     progress.write("💻 Dev is generating actual product source files…")
                     generated_files = build_project_files(router, current_project, task, outputs["plan"], outputs["implementation"])
                     outputs["generated_files_summary"] = "\\n".join(f"- {path}" for path in generated_files)
+                    # Give QA and Security actual source excerpts to review, not just filenames.
+                    outputs["generated_files_context"] = "\\n\\n".join(
+                        f"### {path}\\n```\\n{body[:6000]}\\n```"
+                        for path, body in list(generated_files.items())[:8]
+                    )[:24000]
                     store.add_event(run_id, "Dev · Code Builder", task, "code_files_generated", "completed", summary=f"Generated {len(generated_files)} reviewable source files")
                     progress.write(f"✅ Generated {len(generated_files)} real source files")
                 except CodeBuildError as exc:
