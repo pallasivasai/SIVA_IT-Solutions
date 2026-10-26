@@ -92,9 +92,6 @@ st.markdown("""
  <p>Follow task ownership, workflow hand-offs, provider usage, QA/security reports and review-ready GitHub changes.</p>
 </div>""", unsafe_allow_html=True)
 
-elif page == "Office Floor":
-    from streamlit_autorefresh import st_autorefresh
-    st_autorefresh(interval=5000, key="office_live_refresh")
 
 events = store.recent_events(limit=300)
 failed = sum(e.get("status") == "failed" for e in events)
