@@ -89,6 +89,32 @@ class GitHubService:
         pr = self.repository.create_pull(title=f"AI proposal: {project_name[:100]}", body=f"""## Summary\nComplete AI-generated product source bundle plus research, QA, security and go-to-market reports for human review.\n\n## Original requirement\n{task[:4000]}\n\n## Review checklist\n- [ ] Inspect proposed changes\n- [ ] Check acceptance criteria and tests\n- [ ] Review security and secrets\n- [ ] Approve explicitly before merge\n\n**Safety:** This app does not merge PRs, run generated code, or deploy production.\n""", head=branch_name, base=base_branch, draft=False)
         return {"number": pr.number, "url": pr.html_url, "branch": branch_name}
 
+    def create_binary_change_request(
+        self, project_name: str, task: str, path: str, content: bytes, base_branch: str = "main"
+    ) -> dict[str, Any]:
+        """Create a reviewable PR containing a binary artifact such as an Excel workbook."""
+        import base64
+        if not path or path.startswith("/") or ".." in path.split("/") or not path.endswith(".xlsx"):
+            raise GitHubError("Unsafe binary artifact path rejected.")
+        if not content or len(content) > 8_000_000:
+            raise GitHubError("Excel artifact is empty or exceeds the 8 MB safety limit.")
+        base = self.repository.get_branch(base_branch)
+        branch_name = f"ai-leads/{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{self._slug(project_name)}"
+        self.repository.create_git_ref(ref=f"refs/heads/{branch_name}", sha=base.commit.sha)
+        blob = self.repository.create_git_blob(base64.b64encode(content).decode("ascii"), "base64")
+        tree = self.repository.create_git_tree([{"path": path, "mode": "100644", "type": "blob", "sha": blob.sha}], base.commit.commit.tree)
+        commit = self.repository.create_git_commit(f"data: add sourced leads workbook for {project_name[:70]}", tree, [base.commit.commit])
+        self.repository.get_git_ref(f"heads/{branch_name}").edit(commit.sha)
+        pr = self.repository.create_pull(
+            title=f"Sales leads workbook: {project_name[:80]}",
+            body=("## Sourced lead research workbook\n\n"
+                  f"- Artifact: `{path}`\n"
+                  "- Contains public search-result evidence and source URLs; each prospect requires verification.\n"
+                  "- No personal email addresses are guessed and no outreach is sent.\n\n"
+                  f"## Request\n{task[:2000]}\n\n**Safety:** Review the workbook before use. This PR is not automatically merged."),
+            head=branch_name, base=base_branch, draft=False)
+        return {"number": pr.number, "url": pr.html_url, "branch": branch_name, "path": path}
+
     def list_open_prs(self, owner: str, repo: str) -> list[dict[str, Any]]:
         try:
             target = self.client.get_repo(f"{owner}/{repo}")
