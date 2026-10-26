@@ -100,7 +100,7 @@ m4.metric("PRs recorded", pr_count)
 if page == "Office Floor":
     import html
     st.subheader("🏢 Virtual AI Office")
-    st.caption("Auto-refreshes every 5 seconds. Each agent owns a defined role; statuses are based on recorded events, not simulated activity. Agents stay IDLE when no workflow is running.")
+    st.caption("Auto-refreshes every 5 seconds and displays events from the newest workflow run only. WORKING/DONE/ERROR are event-driven; this refresh does not itself run a background worker.")
     latest: dict[str, dict[str, Any]] = {}
     def canonical_agent_name(raw_name: str) -> str:
         raw = raw_name.strip()
@@ -108,7 +108,10 @@ if page == "Office Floor":
         if raw in aliases:
             return aliases[raw]
         return raw.split(" · ", 1)[0].strip()
-    for ev in events:
+    # Show only the newest workflow run; old DONE events must not masquerade as current activity.
+    latest_run_id = str(events[0].get("run_id", "")) if events else ""
+    current_run_events = [ev for ev in events if str(ev.get("run_id", "")) == latest_run_id] if latest_run_id else []
+    for ev in current_run_events:
         name = canonical_agent_name(str(ev.get("agent_name", "")))
         if name and name not in latest:
             latest[name] = ev
@@ -156,7 +159,7 @@ elif page == "Task Board":
 
 elif page == "AI Project Room":
     st.subheader("🧩 Assign a task to the AI team")
-    st.write("Atlas dispatches tasks → Mira coordinates dependencies → Scout researches industry gaps → Nova designs a product to fill a gap → Dev builds source files → Tara checks quality → Shield reviews security → Seller prepares a sales plan. The files are packaged into a reviewable GitHub PR; generated code is never executed by this dashboard.")
+    st.write("Atlas dispatches → Mira sequences ownership → Scout researches → Nova scopes the MVP → Dev generates the actual source tree → Tara checks quality → Shield reviews security → Seller prepares optional go-to-market material. The PR must contain the product source and a product-specific README; Seller is not the code builder. Generated code is not executed by this dashboard.")
     with st.form("task_form"):
         project = st.text_input("Project name", value=st.session_state.selected_project)
         task = st.text_area("Requirement", height=170, placeholder="Describe the feature, constraints, acceptance criteria and what must not change.")
@@ -215,7 +218,7 @@ elif page == "AI Project Room":
                 progress.write("Shield completed the security review")
                 sales = run_agent_step(router, store, run_id, team[7], current_project, task, outputs)
                 outputs["sales"] = sales["output"]
-                progress.write("Seller prepared go-to-market assets")
+                progress.write("Seller prepared optional go-to-market assets (not product source code)")
                 st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
                 progress.update(label="Workflow completed", state="complete", expanded=False)
             except ProviderError as exc:
