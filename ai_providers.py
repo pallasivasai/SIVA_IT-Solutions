@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
+from urllib.error import URLError, HTTPError
+from urllib.request import Request, urlopen
 import streamlit as st
 
 class ProviderError(RuntimeError):
@@ -23,8 +26,11 @@ def get_setting(name: str, default: str = "") -> str:
         return default
 
 class ProviderRouter:
-    """OpenAI first; Gemini fallback for quota/rate-limit/transient errors."""
+    """Local-first routing when enabled: Ollama, then OpenAI, then Gemini."""
     def __init__(self) -> None:
+        self.provider_preference = get_setting("AI_PROVIDER", "auto").strip().lower()
+        self.ollama_url = get_setting("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        self.ollama_model = get_setting("OLLAMA_MODEL", "qwen2.5:7b")
         self.openai_key = get_setting("OPENAI_API_KEY")
         self.openai_model = get_setting("OPENAI_MODEL", "gpt-4.1-mini")
         self.gemini_key = get_setting("GEMINI_API_KEY")
@@ -36,8 +42,38 @@ class ProviderRouter:
         phrases = ("rate limit", "rate_limit", "429", "quota", "insufficient_quota", "resource_exhausted", "temporarily unavailable", "service unavailable", "overloaded", "timeout", "timed out", "connection error", "503", "502")
         return any(phrase in message for phrase in phrases)
 
+    def _generate_ollama(self, system_prompt: str, user_prompt: str) -> ModelReply:
+        payload = json.dumps({
+            "model": self.ollama_model,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "options": {"temperature": 0.2},
+        }).encode("utf-8")
+        request = Request(self.ollama_url + "/api/chat", data=payload,
+                          headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urlopen(request, timeout=120) as response:
+                result = json.loads(response.read().decode("utf-8"))
+        except (URLError, HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            raise ProviderError(f"Ollama unavailable at {self.ollama_url} using {self.ollama_model}: {exc}") from exc
+        content = result.get("message", {}).get("content", "")
+        if not isinstance(content, str) or not content.strip():
+            raise ProviderError("Ollama returned an empty response.")
+        return ModelReply(content, "Ollama", self.ollama_model)
+
     def generate(self, system_prompt: str, user_prompt: str) -> ModelReply:
         errors: list[str] = []
+        ollama_first = self.provider_preference == "ollama" or bool(os.getenv("OLLAMA_BASE_URL"))
+        if ollama_first:
+            try:
+                return self._generate_ollama(system_prompt, user_prompt)
+            except ProviderError as exc:
+                errors.append(str(exc))
+                if self.provider_preference == "ollama":
+                    raise ProviderError("Local Ollama mode failed; cloud providers were not called. " + str(exc)) from exc
         if self.openai_key:
             try:
                 from openai import OpenAI
