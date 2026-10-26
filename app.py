@@ -84,6 +84,10 @@ st.markdown("""
  <p>Follow task ownership, workflow hand-offs, provider usage, QA/security reports and review-ready GitHub changes.</p>
 </div>""", unsafe_allow_html=True)
 
+if page == "Office Floor":
+    from streamlit_autorefresh import st_autorefresh
+    st_autorefresh(interval=5000, key="office_live_refresh")
+
 events = store.recent_events(limit=300)
 failed = sum(e.get("status") == "failed" for e in events)
 pr_count = sum(e.get("event_type") == "pull_request_created" for e in events)
@@ -96,13 +100,19 @@ m4.metric("PRs recorded", pr_count)
 if page == "Office Floor":
     import html
     st.subheader("🏢 Virtual AI Office")
-    st.caption("A pixel-office view of the real workflow events. Agent states reflect recorded activity; idle agents are not pretending to work.")
+    st.caption("Auto-refreshes every 5 seconds. Each agent owns a defined role; statuses are based on recorded events, not simulated activity. Agents stay IDLE when no workflow is running.")
     latest: dict[str, dict[str, Any]] = {}
+    def canonical_agent_name(raw_name: str) -> str:
+        raw = raw_name.strip()
+        aliases = {"Dev · Code Builder": "Dev", "GitHub Integrator": "Atlas"}
+        if raw in aliases:
+            return aliases[raw]
+        return raw.split(" · ", 1)[0].strip()
     for ev in events:
-        name = ev.get("agent_name", "")
+        name = canonical_agent_name(str(ev.get("agent_name", "")))
         if name and name not in latest:
             latest[name] = ev
-    labels = {"running": ("WORKING", "running"), "completed": ("DONE", "done"), "failed": ("ERROR", "failed"), "waiting_approval": ("WAITING FOR REVIEW", "waiting"), "idle": ("IDLE", "idle")}
+    labels = {"running": ("WORKING", "running"), "completed": ("DONE", "done"), "failed": ("ERROR", "failed"), "waiting_approval": ("WAITING FOR REVIEW", "waiting"), "idle": ("IDLE", "idle"), "code_files_generated": ("DONE", "done"), "agent_started": ("WORKING", "running"), "agent_completed": ("DONE", "done"), "agent_failed": ("ERROR", "failed")}
     stations = []
     for agent in team:
         ev = latest.get(agent["name"], {})
@@ -112,7 +122,7 @@ if page == "Office Floor":
         role = html.escape(str(agent["role"].split("·")[0].strip()))
         emoji = html.escape(str(agent.get("emoji", "🤖")))
         stations.append('<div class="agent-station"><div class="agent-sprite">' + emoji + '</div><div class="agent-desk"></div><div class="agent-name">' + name + '</div><div class="agent-role">' + role + '</div><div class="agent-status ' + css_status + '">' + status + '</div><div style="margin-top:5px;text-align:center;color:#3c5b5b;font-size:.65rem">' + task + '</div></div>')
-    office_html = '<div class="office-shell"><div class="office-top"><span>▦ SIVA IT SOLUTIONS · FLOOR 01</span><span>7 AGENT WORKSTATIONS</span></div><div class="office-floor">' + "".join(stations) + '</div><div class="office-bottom"><span>● VIEW OF RECORDED EVENTS</span><span>Human approval required · No auto-merge/deploy</span></div></div>'
+    office_html = '<div class="office-shell"><div class="office-top"><span>▦ SIVA IT SOLUTIONS · FLOOR 01</span><span>8 AGENT WORKSTATIONS · AUTO-REFRESH 5s</span></div><div class="office-floor">' + "".join(stations) + '</div><div class="office-bottom"><span>● VIEW OF RECORDED EVENTS</span><span>Human approval required · No auto-merge/deploy</span></div></div>'
     st.markdown(office_html, unsafe_allow_html=True)
     st.divider()
     st.subheader("🧭 Workflow lane")
