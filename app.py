@@ -12,6 +12,28 @@ from github_service import GitHubError, GitHubService
 from storage import EventStore
 
 st.set_page_config(page_title="SIVA IT Solutions · AI Office", page_icon="🏢", layout="wide")
+
+# This repo is public. Require an owner-configured password before exposing API-backed actions.
+import hmac
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+try:
+    APP_PASSWORD = APP_PASSWORD or str(st.secrets.get("APP_PASSWORD", ""))
+except Exception:
+    pass
+
+if not APP_PASSWORD or APP_PASSWORD == "change-this-to-a-long-random-password":
+    st.error("Access is locked: configure a strong APP_PASSWORD in Streamlit Secrets before using this public dashboard.")
+    st.stop()
+if not st.session_state.get("authenticated", False):
+    st.title("🔐 SIVA IT Solutions · Secure Office Login")
+    entered = st.text_input("Office access password", type="password")
+    if st.button("Unlock dashboard", type="primary"):
+        if hmac.compare_digest(entered, APP_PASSWORD):
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Incorrect password.")
+    st.stop()
 st.markdown("""
 <style>
 .stApp { background: radial-gradient(circle at 14% 0%, #17314b 0%, #0b1422 44%, #070c14 100%); }
