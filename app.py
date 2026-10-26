@@ -178,7 +178,11 @@ elif page == "AI Project Room":
             outputs: dict[str, Any] = {}
             progress = st.status("Starting task workflow…", expanded=True)
             try:
-                progress.write("Scout is researching the industry gap and competitors…")
+                # Record Scout as the current owner before external research starts so the
+                # Virtual Office shows the real active task even if web search fails.
+                store.add_event(run_id, "Scout", task, "agent_started", "running",
+                                summary="Scout is collecting public market evidence and competitor sources")
+                progress.write("🔎 Scout · Market Researcher — collecting public evidence and competitor sources…")
                 outputs["market_evidence"] = build_research_context(task)
                 market_gate = evaluate_market_gate(outputs["market_evidence"])
                 outputs["market_gate"] = market_gate
@@ -186,114 +190,131 @@ elif page == "AI Project Room":
                                 "completed" if market_gate["passed"] else "failed",
                                 summary=f"{market_gate['source_count']} distinct source URLs; passed={market_gate['passed']}")
                 if not market_gate["passed"]:
-                    raise RuntimeError(market_gate["reason"])
-                progress.write(f"Research gate passed with {market_gate['source_count']} distinct source URLs")
-                scout = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
-                outputs["research"] = scout["output"]
-                progress.write("Scout completed gap research")
-                strategy = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
-                outputs["product_strategy"] = strategy["output"]
-                progress.write("Nova selected an MVP direction")
-                implementation = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
-                outputs["implementation"] = implementation["output"]
-                progress.write("Dev prepared implementation notes")
-                generated_files: dict[str, str] = {}
-                try:
-                    progress.write("Dev is generating actual product source files…")
-                    build_brief = task + "\n\nPRODUCT STRATEGY / GAP TO FILL:\n" + outputs["product_strategy"] + "\n\nMARKET EVIDENCE:\n" + outputs["market_evidence"]
-                    generated_files = build_project_files(router, current_project, build_brief, outputs["product_strategy"], outputs["implementation"])
-                    outputs["generated_files_summary"] = "\n".join(f"- {path}" for path in generated_files)
-                    outputs["generated_files_context"] = "\n\n".join(f"### {path}\n{body[:6000]}" for path, body in list(generated_files.items())[:8])[:24000]
-                    static_check = inspect_generated_files(generated_files)
-                    outputs["static_qa"] = "\n".join("- " + item["status"] + ": " + item["detail"] for item in static_check["checks"])
-                    outputs["generated_files_context"] += "\n\n## Deterministic non-executing checks\n" + outputs["static_qa"]
-                    store.add_event(run_id, "Dev · Code Builder", task, "code_files_generated", "completed", summary=f"Generated {len(generated_files)} reviewable source files")
-                    progress.write(f"Generated {len(generated_files)} real source files")
-                except CodeBuildError as exc:
-                    outputs["code_build_error"] = str(exc)
-                    store.add_event(run_id, "Dev · Code Builder", task, "code_generation_failed", "failed", summary=str(exc))
-                    progress.write(f"Code generation needs retry: {exc}")
-                qa = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
-                outputs["qa"] = qa["output"]
-                progress.write("Tara completed the QA report")
-                security = run_agent_step(router, store, run_id, team[4], current_project, task, outputs)
-                outputs["security"] = security["output"]
-                progress.write("Shield completed the security review")
-                # One bounded feedback loop: Dev receives the actual QA/security findings,
-                # regenerates the source tree, and both reviewers inspect the revised files.
-                if generated_files:
-                    progress.write("Dev is receiving Tara/Shield findings for one remediation pass…")
-                    review_feedback = (
-                        "REQUIRED REMEDIATION PASS. Review the existing source files and fix concrete findings below. "
-                        "Preserve unrelated functionality. Return file-level implementation notes; do not claim tests were run.\n\n"
-                        "CURRENT SOURCE FILES:\n" + outputs.get("generated_files_context", "")[:18000] +
-                        "\n\nTARA QA FINDINGS:\n" + outputs.get("qa", "")[:7000] +
-                        "\n\nSHIELD SECURITY FINDINGS:\n" + outputs.get("security", "")[:7000] +
-                        "\n\nSTATIC CHECK RESULTS:\n" + outputs.get("static_qa", "")
+                    store.add_event(run_id, "Scout", task, "agent_failed", "failed",
+                                    summary=market_gate["reason"])
+                    outputs["research"] = (
+                        "SCOUT BLOCKED — public web research did not return enough distinct source URLs. "
+                        "The agent did not fabricate evidence. Check Streamlit dependency/network access and retry.\n\n"
+                        + outputs["market_evidence"]
                     )
-                    try:
-                        remediation = run_agent_step(router, store, run_id, team[2], current_project, review_feedback, outputs)
-                        outputs["remediation"] = remediation["output"]
-                        revised_brief = (
-                            task + "\n\nAPPROVED PRODUCT STRATEGY:\n" + outputs.get("product_strategy", "") +
-                            "\n\nMARKET EVIDENCE:\n" + outputs.get("market_evidence", "") +
-                            "\n\nQA FINDINGS TO FIX:\n" + outputs.get("qa", "") +
-                            "\n\nSECURITY FINDINGS TO FIX:\n" + outputs.get("security", "") +
-                            "\n\nDEV REMEDIATION NOTES:\n" + outputs["remediation"]
-                        )
-                        revised_files = build_project_files(
-                            router, current_project, revised_brief,
-                            outputs.get("product_strategy", ""), outputs["remediation"]
-                        )
-                        revised_checks = inspect_generated_files(revised_files)
-                        generated_files = revised_files
-                        outputs["generated_files_summary"] = "\n".join(f"- {path}" for path in generated_files)
-                        outputs["generated_files_context"] = "\n\n".join(
-                            f"### {path}\n{body[:6000]}" for path, body in list(generated_files.items())[:8]
-                        )[:24000]
-                        outputs["static_qa"] = "\n".join(
-                            "- " + item["status"] + ": " + item["detail"] for item in revised_checks["checks"]
-                        )
-                        outputs["generated_files_context"] += "\n\n## Deterministic non-executing checks\n" + outputs["static_qa"]
-                        store.add_event(run_id, "Dev · Remediation", task, "code_remediated", "completed",
-                                        summary=f"Regenerated {len(generated_files)} source files from QA/security feedback")
-                        progress.write("Revised source generated; Tara and Shield are re-reviewing it…")
-                        outputs["qa"] = run_agent_step(router, store, run_id, team[3], current_project,
-                                                       "RE-REVIEW revised source. Verify previous findings are fixed and identify remaining defects. " + task,
-                                                       outputs)["output"]
-                        outputs["security"] = run_agent_step(router, store, run_id, team[4], current_project,
-                                                             "RE-REVIEW revised source. Verify previous security findings are fixed and identify residual risks. " + task,
-                                                             outputs)["output"]
-                    except CodeBuildError as exc:
-                        outputs["remediation_error"] = str(exc)
-                        store.add_event(run_id, "Dev · Remediation", task, "remediation_failed", "failed", summary=str(exc))
-                        progress.warning(f"Remediation pass did not produce revised source: {exc}")
-                final_static_checks = inspect_generated_files(generated_files) if generated_files else {"passed": False, "failures": 1, "warnings": 0, "checks": []}
-                outputs["final_static_checks"] = final_static_checks
-                release_gate = evaluate_release_gate(
-                    generated_files, final_static_checks, outputs.get("qa", ""), outputs.get("security", "")
-                )
-                outputs["release_gate"] = release_gate
-                store.add_event(run_id, "Final Release Auditor", task, "release_gate_checked",
-                                "completed" if release_gate["passed"] else "blocked",
-                                summary="; ".join(release_gate["reasons"]) if release_gate["reasons"] else "QA, security and deterministic checks passed")
-                if release_gate["passed"]:
-                    progress.write("Release gate passed. Lead Research is finding sourced, relevant prospects…")
-                    outputs["lead_evidence"] = build_research_context(
-                        "businesses and companies likely to buy " + current_project + " in India and relevant target markets public company websites contact page"
-                    )
-                    leads = run_agent_step(router, store, run_id, team[5], current_project, task, outputs)
-                    outputs["leads"] = leads["output"]
-                    progress.write("Lead Research handed sourced prospect findings to Seller.")
-                    sales = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
-                    outputs["sales"] = sales["output"]
-                    progress.write("Seller prepared tailored outreach and a follow-up sequence; no messages were sent.")
+                    outputs["workflow_blocker"] = market_gate["reason"]
+                    st.session_state.last_run = {
+                        "run_id": run_id, "project": current_project, "task": task,
+                        "outputs": outputs, "files": {}, "base_branch": base_branch,
+                    }
+                    progress.update(label="Workflow blocked · Scout needs public sources",
+                                    state="error", expanded=True)
+                    st.error(market_gate["reason"])
+                    st.info("Open **Office Floor** to see Scout marked ERROR and the exact task it attempted. Product planning will not run until real sources are available.")
                 else:
-                    outputs["sales"] = "BLOCKED: Seller is not allowed to proceed until QA, security, and deterministic source checks explicitly pass.\n" + "\n".join(release_gate["reasons"])
-                    store.add_event(run_id, "Seller", task, "sales_blocked_by_release_gate", "blocked",
-                                    summary="; ".join(release_gate["reasons"]))
-                    progress.warning("Release gate blocked the product. Seller and GitHub PR actions remain disabled until blockers are fixed.")
-                st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
+                    progress.write(f"Research gate passed with {market_gate['source_count']} distinct source URLs")
+                if market_gate["passed"]:
+                    scout = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
+                    outputs["research"] = scout["output"]
+                    progress.write("Scout completed gap research")
+                    strategy = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
+                    outputs["product_strategy"] = strategy["output"]
+                    progress.write("Nova selected an MVP direction")
+                    implementation = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
+                    outputs["implementation"] = implementation["output"]
+                    progress.write("Dev prepared implementation notes")
+                    generated_files: dict[str, str] = {}
+                    try:
+                        progress.write("Dev is generating actual product source files…")
+                        build_brief = task + "\n\nPRODUCT STRATEGY / GAP TO FILL:\n" + outputs["product_strategy"] + "\n\nMARKET EVIDENCE:\n" + outputs["market_evidence"]
+                        generated_files = build_project_files(router, current_project, build_brief, outputs["product_strategy"], outputs["implementation"])
+                        outputs["generated_files_summary"] = "\n".join(f"- {path}" for path in generated_files)
+                        outputs["generated_files_context"] = "\n\n".join(f"### {path}\n{body[:6000]}" for path, body in list(generated_files.items())[:8])[:24000]
+                        static_check = inspect_generated_files(generated_files)
+                        outputs["static_qa"] = "\n".join("- " + item["status"] + ": " + item["detail"] for item in static_check["checks"])
+                        outputs["generated_files_context"] += "\n\n## Deterministic non-executing checks\n" + outputs["static_qa"]
+                        store.add_event(run_id, "Dev · Code Builder", task, "code_files_generated", "completed", summary=f"Generated {len(generated_files)} reviewable source files")
+                        progress.write(f"Generated {len(generated_files)} real source files")
+                    except CodeBuildError as exc:
+                        outputs["code_build_error"] = str(exc)
+                        store.add_event(run_id, "Dev · Code Builder", task, "code_generation_failed", "failed", summary=str(exc))
+                        progress.write(f"Code generation needs retry: {exc}")
+                    qa = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
+                    outputs["qa"] = qa["output"]
+                    progress.write("Tara completed the QA report")
+                    security = run_agent_step(router, store, run_id, team[4], current_project, task, outputs)
+                    outputs["security"] = security["output"]
+                    progress.write("Shield completed the security review")
+                    # One bounded feedback loop: Dev receives the actual QA/security findings,
+                    # regenerates the source tree, and both reviewers inspect the revised files.
+                    if generated_files:
+                        progress.write("Dev is receiving Tara/Shield findings for one remediation pass…")
+                        review_feedback = (
+                            "REQUIRED REMEDIATION PASS. Review the existing source files and fix concrete findings below. "
+                            "Preserve unrelated functionality. Return file-level implementation notes; do not claim tests were run.\n\n"
+                            "CURRENT SOURCE FILES:\n" + outputs.get("generated_files_context", "")[:18000] +
+                            "\n\nTARA QA FINDINGS:\n" + outputs.get("qa", "")[:7000] +
+                            "\n\nSHIELD SECURITY FINDINGS:\n" + outputs.get("security", "")[:7000] +
+                            "\n\nSTATIC CHECK RESULTS:\n" + outputs.get("static_qa", "")
+                        )
+                        try:
+                            remediation = run_agent_step(router, store, run_id, team[2], current_project, review_feedback, outputs)
+                            outputs["remediation"] = remediation["output"]
+                            revised_brief = (
+                                task + "\n\nAPPROVED PRODUCT STRATEGY:\n" + outputs.get("product_strategy", "") +
+                                "\n\nMARKET EVIDENCE:\n" + outputs.get("market_evidence", "") +
+                                "\n\nQA FINDINGS TO FIX:\n" + outputs.get("qa", "") +
+                                "\n\nSECURITY FINDINGS TO FIX:\n" + outputs.get("security", "") +
+                                "\n\nDEV REMEDIATION NOTES:\n" + outputs["remediation"]
+                            )
+                            revised_files = build_project_files(
+                                router, current_project, revised_brief,
+                                outputs.get("product_strategy", ""), outputs["remediation"]
+                            )
+                            revised_checks = inspect_generated_files(revised_files)
+                            generated_files = revised_files
+                            outputs["generated_files_summary"] = "\n".join(f"- {path}" for path in generated_files)
+                            outputs["generated_files_context"] = "\n\n".join(
+                                f"### {path}\n{body[:6000]}" for path, body in list(generated_files.items())[:8]
+                            )[:24000]
+                            outputs["static_qa"] = "\n".join(
+                                "- " + item["status"] + ": " + item["detail"] for item in revised_checks["checks"]
+                            )
+                            outputs["generated_files_context"] += "\n\n## Deterministic non-executing checks\n" + outputs["static_qa"]
+                            store.add_event(run_id, "Dev · Remediation", task, "code_remediated", "completed",
+                                            summary=f"Regenerated {len(generated_files)} source files from QA/security feedback")
+                            progress.write("Revised source generated; Tara and Shield are re-reviewing it…")
+                            outputs["qa"] = run_agent_step(router, store, run_id, team[3], current_project,
+                                                           "RE-REVIEW revised source. Verify previous findings are fixed and identify remaining defects. " + task,
+                                                           outputs)["output"]
+                            outputs["security"] = run_agent_step(router, store, run_id, team[4], current_project,
+                                                                 "RE-REVIEW revised source. Verify previous security findings are fixed and identify residual risks. " + task,
+                                                                 outputs)["output"]
+                        except CodeBuildError as exc:
+                            outputs["remediation_error"] = str(exc)
+                            store.add_event(run_id, "Dev · Remediation", task, "remediation_failed", "failed", summary=str(exc))
+                            progress.warning(f"Remediation pass did not produce revised source: {exc}")
+                    final_static_checks = inspect_generated_files(generated_files) if generated_files else {"passed": False, "failures": 1, "warnings": 0, "checks": []}
+                    outputs["final_static_checks"] = final_static_checks
+                    release_gate = evaluate_release_gate(
+                        generated_files, final_static_checks, outputs.get("qa", ""), outputs.get("security", "")
+                    )
+                    outputs["release_gate"] = release_gate
+                    store.add_event(run_id, "Final Release Auditor", task, "release_gate_checked",
+                                    "completed" if release_gate["passed"] else "blocked",
+                                    summary="; ".join(release_gate["reasons"]) if release_gate["reasons"] else "QA, security and deterministic checks passed")
+                    if release_gate["passed"]:
+                        progress.write("Release gate passed. Lead Research is finding sourced, relevant prospects…")
+                        outputs["lead_evidence"] = build_research_context(
+                            "businesses and companies likely to buy " + current_project + " in India and relevant target markets public company websites contact page"
+                        )
+                        leads = run_agent_step(router, store, run_id, team[5], current_project, task, outputs)
+                        outputs["leads"] = leads["output"]
+                        progress.write("Lead Research handed sourced prospect findings to Seller.")
+                        sales = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
+                        outputs["sales"] = sales["output"]
+                        progress.write("Seller prepared tailored outreach and a follow-up sequence; no messages were sent.")
+                    else:
+                        outputs["sales"] = "BLOCKED: Seller is not allowed to proceed until QA, security, and deterministic source checks explicitly pass.\n" + "\n".join(release_gate["reasons"])
+                        store.add_event(run_id, "Seller", task, "sales_blocked_by_release_gate", "blocked",
+                                        summary="; ".join(release_gate["reasons"]))
+                        progress.warning("Release gate blocked the product. Seller and GitHub PR actions remain disabled until blockers are fixed.")
+                    st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
                 progress.update(
                     label="Workflow completed" if release_gate["passed"] else "Workflow blocked by release gate",
                     state="complete" if release_gate["passed"] else "error",
@@ -306,7 +327,8 @@ elif page == "AI Project Room":
             except Exception as exc:
                 store.add_event(run_id, "System", task, "workflow_failed", "failed", summary=f"{type(exc).__name__}: {exc}")
                 progress.update(label="Workflow stopped", state="error", expanded=True)
-                st.exception(exc)
+                st.error(f"Workflow stopped: {type(exc).__name__}: {exc}")
+                st.caption("Open Office Floor or Task Board to inspect which agent last ran and the recorded task.")
     result = st.session_state.last_run
     if result:
         st.markdown(f"### Latest run · {result['project']}")
