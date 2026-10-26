@@ -5,7 +5,7 @@ A Streamlit dashboard for a role-based AI engineering workflow. It displays agen
 ## Included features
 - **Virtual Office Floor:** a pixel-art office layout with seven agent workstations, role labels and status badges driven by recorded workflow events; includes a workflow lane and recent activity log.
 - **Task Board:** timestamped activity events and run filtering.
-- **AI Project Room:** task assignment → public web evidence collection → industry-gap research → product strategy → source generation → QA/security reviews → sales plan → human-reviewed GitHub PR.
+- **AI Project Room:** Atlas dispatch plan → Mira task coordination → public web evidence collection → industry-gap research → product strategy → source generation → QA/security reviews → sales plan → human-reviewed GitHub PR.
 - **OpenAI primary + Gemini fallback:** fallback for likely quota/rate-limit/transient failures when Gemini is configured.
 - **GitHub review workflow:** create a dedicated feature branch and PR containing generated product source files plus role reports. No merge/deployment methods are implemented.
 - **Secret-safe settings:** environment variables or Streamlit Secrets; no API keys in source.
