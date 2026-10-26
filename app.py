@@ -220,7 +220,7 @@ elif page == "AI Project Room":
             st.error(f"Product source files were not generated: {result['code_build_error']}")
         generated_files = result.get("files", {})
         if generated_files:
-            st.success(f"Developer generated {len(generated_files)} actual project files. They will be added under generated-project/ in the PR.")
+            st.success(f"Developer generated {len(generated_files)} actual project files. They will be packaged under products/<product-name>/ in the PR.")
             for path, body in generated_files.items():
                 with st.expander(path, expanded=False):
                     st.code(body, language=path.rsplit(".", 1)[-1] if "." in path else "text")
