@@ -43,7 +43,7 @@ class GitHubService:
         project = str(result.get("project", "project"))
         task = str(result.get("task", ""))
         created = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        content = f"""# AI workflow proposal: {project}\n\nCreated: {created}\n\n> AI-generated review artifact. No model-generated code has been executed or independently verified.\n\n## User requirement\n\n{task}\n\n## Product plan\n\n{outputs.get('plan', 'Not available')}\n\n## Implementation proposal\n\n{outputs.get('implementation', 'Not available')}\n\n## QA report\n\n{outputs.get('qa', 'Not available')}\n\n## Security review\n\n{outputs.get('security', 'Not available')}\n\n## Human approval boundary\n\nReview this proposal and any implementation separately. This PR does not merge or deploy itself.\n"""
+        content = f"""# Product delivery: {project}\n\nCreated: {created}\n\n> AI-generated review artifact. Inspect product code and validate it before use. Nothing was auto-merged or deployed.\n\n## Original goal\n\n{task}\n\n## Task assignment\n\n{outputs.get('assignment', outputs.get('plan', 'Not available'))}\n\n## Industry-gap research and evidence\n\n{outputs.get('research', outputs.get('market_evidence', 'Not available'))}\n\n## Product strategy: how this product fills the gap\n\n{outputs.get('product_strategy', 'Not available')}\n\n## Implementation proposal\n\n{outputs.get('implementation', 'Not available')}\n\n## QA report\n\n{outputs.get('qa', 'Not available')}\n\n## Security review\n\n{outputs.get('security', 'Not available')}\n\n## Sales and go-to-market plan\n\n{outputs.get('sales', 'Not available')}\n\n## How to use this PR\n\n1. Open the matching folder under products/.\n2. Read README.md for setup and run commands.\n3. Review source, tests and dependencies; run in a disposable local environment.\n4. Confirm research links and validate pricing/market assumptions.\n5. Request human review before merging.\n\n## Human approval boundary\n\nThis PR does not merge or deploy itself.\n"""
         if len(content.encode("utf-8")) > 100_000:
             raise GitHubError("Proposal exceeds the 100 KB safety limit.")
         files = {"ai-workflow/README.md": content}
@@ -51,21 +51,29 @@ class GitHubService:
         if generated:
             if not isinstance(generated, dict) or len(generated) > 12:
                 raise GitHubError("Generated project file bundle is invalid or too large.")
+            product_slug = self._slug(project)
             for path, body in generated.items():
                 if not isinstance(path, str) or not path.startswith("generated-project/") or ".." in path.split("/") or not isinstance(body, str):
                     raise GitHubError("Unsafe generated project file rejected.")
                 if len(body.encode("utf-8")) > 30_000:
                     raise GitHubError(f"Generated file exceeds 30 KB: {path}")
-                if path in files:
-                    raise GitHubError(f"Duplicate generated file path: {path}")
-                files[path] = body
+                product_path = "products/" + product_slug + "/" + path[len("generated-project/"):]
+                if product_path in files:
+                    raise GitHubError(f"Duplicate generated file path: {product_path}")
+                files[product_path] = body
+            files["products/" + product_slug + "/PRODUCT_BRIEF.md"] = (
+                f"# {project}\\n\\n"
+                "## What this product does\\n\\n" + str(outputs.get("product_strategy", "See the parent ai-workflow report.")) +
+                "\\n\\n## Research and customer gap\\n\\n" + str(outputs.get("research", "See the parent ai-workflow report.")) +
+                "\\n\\n## How to run\\n\\nRead README.md in this folder and follow its setup instructions. Review and test before production use.\\n"
+            )
         if sum(len(body.encode("utf-8")) for body in files.values()) > 220_000:
             raise GitHubError("Combined PR bundle exceeds the 220 KB safety limit.")
         return files
 
     def create_change_request(self, project_name: str, task: str, files: dict[str, str], base_branch: str = "main") -> dict[str, Any]:
-        if not files or len(files) > 13:
-            raise GitHubError("Empty file bundle or more than 20 files; stopping for safety.")
+        if not files or len(files) > 14:
+            raise GitHubError("Empty file bundle or more than 14 files; stopping for safety.")
         if any(path.startswith("/") or ".." in path.split("/") for path in files):
             raise GitHubError("Unsafe file path rejected.")
         base = self.repository.get_branch(base_branch)
