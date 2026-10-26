@@ -605,7 +605,7 @@ elif page == "AI Project Room":
                             )
                             progress.write(f"GitHub Integrator created PR #{github_pr['number']}")
                         except Exception as exc:
-                            outputs["github_publish_error"] = f"{type(exc).__name__}: {exc}"
+                            raw_error = f"{type(exc).__name__}: {exc}"
                             store.add_event(
                                 run_id, "GitHub Integrator", task, "github_publish_failed", "failed",
                                 summary=outputs["github_publish_error"],
