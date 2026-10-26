@@ -167,12 +167,12 @@ elif page == "AI Project Room":
                 dispatch = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
                 outputs["dispatch_plan"] = dispatch["output"]
                 progress.write("Atlas created the team dispatch plan")
-                assignment = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
+                assignment = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
                 outputs["assignment"] = assignment["output"]
                 progress.write("Mira refined task ownership")
                 progress.write("Scout is collecting public market evidence…")
                 outputs["market_evidence"] = build_research_context(task)
-                scout = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
+                scout = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
                 outputs["research"] = scout["output"]
                 progress.write("Scout completed gap research")
                 strategy = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
