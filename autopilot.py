@@ -47,9 +47,9 @@ def main() -> None:
     outputs["generated_files_context"] = "\n\n".join("### " + path + "\n" + body[:4000] for path, body in list(files.items())[:8])[:20000]
     checks = inspect_generated_files(files)
     outputs["static_qa"] = "\n".join("- " + item["status"] + ": " + item["detail"] for item in checks["checks"])
-    outputs["qa"] = run_agent_step(router, store, run_id, team[7], project, brief, outputs)["output"]
-    outputs["security"] = run_agent_step(router, store, run_id, team[5], project, brief, outputs)["output"]
-    outputs["sales"] = run_agent_step(router, store, run_id, team[6], project, brief, outputs)["output"]
+    outputs["qa"] = run_agent_step(router, store, run_id, team[5], project, brief, outputs)["output"]
+    outputs["security"] = run_agent_step(router, store, run_id, team[6], project, brief, outputs)["output"]
+    outputs["sales"] = run_agent_step(router, store, run_id, team[7], project, brief, outputs)["output"]
 
     result = {"run_id": run_id, "project": project, "task": brief, "outputs": outputs, "files": files}
     pr = GitHubService().create_change_request(project, brief, GitHubService().generate_file_bundle(result), base_branch="main")
