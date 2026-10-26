@@ -105,7 +105,7 @@ if page == "Office Floor":
     latest: dict[str, dict[str, Any]] = {}
     def canonical_agent_name(raw_name: str) -> str:
         raw = raw_name.strip()
-        aliases = {"Dev · Code Builder": "Dev", "GitHub Integrator": "Atlas"}
+        aliases = {"Dev · Code Builder": "Dev", "GitHub Integrator": "System"}
         if raw in aliases:
             return aliases[raw]
         return raw.split(" · ", 1)[0].strip()
@@ -121,7 +121,7 @@ if page == "Office Floor":
     for agent in team:
         ev = latest.get(agent["name"], {})
         status, css_status = labels.get(ev.get("status", "idle"), ("IDLE", "idle"))
-        task = html.escape(str(ev.get("task", "Waiting for assignment"))[:105])
+        task = html.escape(str(ev.get("task", "Waiting for workflow hand-off"))[:105])
         name = html.escape(str(agent["name"]))
         role = html.escape(str(agent["role"].split("·")[0].strip()))
         emoji = html.escape(str(agent.get("emoji", "🤖")))
@@ -279,6 +279,9 @@ elif page == "AI Project Room":
                                 summary="; ".join(release_gate["reasons"]) if release_gate["reasons"] else "QA, security and deterministic checks passed")
                 if release_gate["passed"]:
                     progress.write("Release gate passed. Lead Research is finding sourced, relevant prospects…")
+                    outputs["lead_evidence"] = build_research_context(
+                        "businesses and companies likely to buy " + current_project + " in India and relevant target markets public company websites contact page"
+                    )
                     leads = run_agent_step(router, store, run_id, team[5], current_project, task, outputs)
                     outputs["leads"] = leads["output"]
                     progress.write("Lead Research handed sourced prospect findings to Seller.")
