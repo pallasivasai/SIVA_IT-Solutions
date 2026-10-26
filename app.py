@@ -7,6 +7,7 @@ from typing import Any
 import streamlit as st
 
 from agents import build_team, run_agent_step
+from code_builder import CodeBuildError, build_project_files
 from ai_providers import ProviderError, ProviderRouter
 from github_service import GitHubError, GitHubService
 from storage import EventStore
@@ -139,7 +140,7 @@ elif page == "Task Board":
 
 elif page == "AI Project Room":
     st.subheader("🧩 Assign a task to the AI team")
-    st.write("Mira plans, Dev writes an implementation proposal, Tara defines QA and Shield reviews security. Outputs are visible at each hand-off.")
+    st.write("Mira plans the product, Dev generates real source files, Tara reviews test coverage and Shield reviews security. The files are packaged into a reviewable GitHub PR; generated code is never executed by this dashboard.")
     with st.form("task_form"):
         project = st.text_input("Project name", value=st.session_state.selected_project)
         task = st.text_area("Requirement", height=170, placeholder="Describe the feature, constraints, acceptance criteria and what must not change.")
@@ -162,14 +163,25 @@ elif page == "AI Project Room":
                 progress.write(f"✅ Mira completed the plan · {plan['provider']}")
                 implementation = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
                 outputs["implementation"] = implementation["output"]
-                progress.write(f"✅ Dev prepared an implementation proposal · {implementation['provider']}")
+                progress.write(f"✅ Dev prepared implementation notes · {implementation['provider']}")
+                generated_files: dict[str, str] = {}
+                try:
+                    progress.write("💻 Dev is generating actual product source files…")
+                    generated_files = build_project_files(router, current_project, task, outputs["plan"], outputs["implementation"])
+                    outputs["generated_files_summary"] = "\\n".join(f"- {path}" for path in generated_files)
+                    store.add_event(run_id, "Dev · Code Builder", task, "code_files_generated", "completed", summary=f"Generated {len(generated_files)} reviewable source files")
+                    progress.write(f"✅ Generated {len(generated_files)} real source files")
+                except CodeBuildError as exc:
+                    outputs["code_build_error"] = str(exc)
+                    store.add_event(run_id, "Dev · Code Builder", task, "code_generation_failed", "failed", summary=str(exc))
+                    progress.write(f"⚠️ Code generation needs retry: {exc}")
                 qa = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
                 outputs["qa"] = qa["output"]
                 progress.write(f"✅ Tara completed the QA report · {qa['provider']}")
                 security = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
                 outputs["security"] = security["output"]
                 progress.write(f"✅ Shield completed the security review · {security['provider']}")
-                st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"base_branch":base_branch}
+                st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
                 progress.update(label="Workflow completed", state="complete", expanded=False)
             except ProviderError as exc:
                 store.add_event(run_id, "System", task, "workflow_failed", "failed", summary=str(exc))
@@ -186,8 +198,18 @@ elif page == "AI Project Room":
         for label, key in [("🧭 Product plan","plan"),("💻 Implementation proposal","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security")]:
             with st.expander(label, expanded=(key == "plan")):
                 st.markdown(result["outputs"].get(key, "No report available."))
-        st.warning("GitHub integration creates a review document from these outputs, not arbitrary executable code. Inspect before approval.")
-        if st.button("Create feature branch + GitHub Pull Request", type="primary", key=f"pr_{result['run_id']}", disabled=not PASSWORD_CONFIGURED):
+        if result.get("code_build_error"):
+            st.error(f"Product source files were not generated: {result['code_build_error']}")
+        generated_files = result.get("files", {})
+        if generated_files:
+            st.success(f"Developer generated {len(generated_files)} actual project files. They will be added under generated-project/ in the PR.")
+            for path, body in generated_files.items():
+                with st.expander(path, expanded=False):
+                    st.code(body, language=path.rsplit(".", 1)[-1] if "." in path else "text")
+        else:
+            st.info("No source files are available yet. Re-run with a smaller, specific MVP requirement to generate a product.")
+        st.warning("Generated files are reviewed as a GitHub PR. This app does not execute generated code, merge PRs, or deploy products automatically.")
+        if st.button("Create feature branch + GitHub Pull Request", type="primary", key=f"pr_{result['run_id']}", disabled=not PASSWORD_CONFIGURED or not generated_files):
             try:
                 gh = GitHubService()
                 bundle = gh.generate_file_bundle(result)
