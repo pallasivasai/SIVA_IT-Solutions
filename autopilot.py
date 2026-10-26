@@ -91,11 +91,18 @@ def main() -> None:
     outputs["lead_evidence"] = build_research_context(
         "businesses and companies that could buy " + project + " in " + niche + " public company websites contact page"
     )
-    outputs["leads"] = run_agent_step(router, store, run_id, team[5], project, brief, outputs)["output"]
-    outputs["sales"] = run_agent_step(router, store, run_id, team[6], project, brief, outputs)["output"]
-
+    outputs["github_release"] = run_agent_step(
+        router, store, run_id, team[5], project,
+        "Publish the reviewed product files to GitHub as a feature branch and human-reviewable PR against main. Do not merge or deploy.",
+        outputs,
+    )["output"]
     result = {"run_id": run_id, "project": project, "task": brief, "outputs": outputs, "files": files}
     pr = GitHubService().create_change_request(project, brief, GitHubService().generate_file_bundle(result), base_branch="main")
+    outputs["github_pr"] = pr
+    store.add_event(run_id, "GitHub Integrator", brief, "pull_request_created", "completed",
+                    summary=f"PR #{pr['number']}: {pr['url']}")
+    outputs["leads"] = run_agent_step(router, store, run_id, team[6], project, brief, outputs)["output"]
+    outputs["sales"] = run_agent_step(router, store, run_id, team[7], project, brief, outputs)["output"]
     print(f"Created product PR #{pr['number']}: {pr['url']}")
     print(f"Project folder: products/{GitHubService._slug(project)}/")
     print(f"Static checks: {checks.get('failures', 0)} failures, {checks.get('warnings', 0)} warnings")
