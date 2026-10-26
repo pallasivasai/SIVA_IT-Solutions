@@ -46,7 +46,22 @@ class GitHubService:
         content = f"""# AI workflow proposal: {project}\n\nCreated: {created}\n\n> AI-generated review artifact. No model-generated code has been executed or independently verified.\n\n## User requirement\n\n{task}\n\n## Product plan\n\n{outputs.get('plan', 'Not available')}\n\n## Implementation proposal\n\n{outputs.get('implementation', 'Not available')}\n\n## QA report\n\n{outputs.get('qa', 'Not available')}\n\n## Security review\n\n{outputs.get('security', 'Not available')}\n\n## Human approval boundary\n\nReview this proposal and any implementation separately. This PR does not merge or deploy itself.\n"""
         if len(content.encode("utf-8")) > 100_000:
             raise GitHubError("Proposal exceeds the 100 KB safety limit.")
-        return {"ai-workflow/README.md": content}
+        files = {"ai-workflow/README.md": content}
+        generated = result.get("files", {})
+        if generated:
+            if not isinstance(generated, dict) or len(generated) > 12:
+                raise GitHubError("Generated project file bundle is invalid or too large.")
+            for path, body in generated.items():
+                if not isinstance(path, str) or not path.startswith("generated-project/") or ".." in path.split("/") or not isinstance(body, str):
+                    raise GitHubError("Unsafe generated project file rejected.")
+                if len(body.encode("utf-8")) > 30_000:
+                    raise GitHubError(f"Generated file exceeds 30 KB: {path}")
+                if path in files:
+                    raise GitHubError(f"Duplicate generated file path: {path}")
+                files[path] = body
+        if sum(len(body.encode("utf-8")) for body in files.values()) > 220_000:
+            raise GitHubError("Combined PR bundle exceeds the 220 KB safety limit.")
+        return files
 
     def create_change_request(self, project_name: str, task: str, files: dict[str, str], base_branch: str = "main") -> dict[str, Any]:
         if not files or len(files) > 20:
