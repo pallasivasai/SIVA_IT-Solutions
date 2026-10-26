@@ -64,7 +64,7 @@ class GitHubService:
         return files
 
     def create_change_request(self, project_name: str, task: str, files: dict[str, str], base_branch: str = "main") -> dict[str, Any]:
-        if not files or len(files) > 20:
+        if not files or len(files) > 13:
             raise GitHubError("Empty file bundle or more than 20 files; stopping for safety.")
         if any(path.startswith("/") or ".." in path.split("/") for path in files):
             raise GitHubError("Unsafe file path rejected.")
