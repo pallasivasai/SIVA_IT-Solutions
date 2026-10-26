@@ -4,8 +4,8 @@ from ai_providers import ProviderRouter
 
 def test_team_members_and_roles():
     team = build_team()
-    assert len(team) == 7
-    assert [m["name"] for m in team] == ["Scout", "Nova", "Dev", "Tara", "Shield", "Lead Research", "Seller"]
+    assert len(team) == 8
+    assert [m["name"] for m in team] == ["Scout", "Nova", "Dev", "Tara", "Shield", "GitHub Integrator", "Lead Research", "Seller"]
     assert all("Task Assignment" not in member["role"] for member in team)
 
 
@@ -85,6 +85,11 @@ def test_market_gate_requires_multiple_source_urls():
     )
     assert result["passed"]
     assert result["source_count"] == 2
+    partial_failure = evaluate_market_gate(
+        "Live web research unavailable from one provider\\nhttps://example.com/a evidence\\nhttps://example.org/b evidence"
+    )
+    assert partial_failure["passed"]
+    assert partial_failure["source_count"] == 2
 
 
 def test_release_gate_fails_closed_until_all_reviews_pass():
@@ -121,6 +126,7 @@ def test_agents_have_fixed_specialist_scopes_and_explicit_handoffs():
     assert "software engineer" in by_name["Dev"]["role"].lower()
     assert "qa engineer" in by_name["Tara"]["role"].lower()
     assert "security engineer" in by_name["Shield"]["role"].lower()
+    assert "release engineer" in by_name["GitHub Integrator"]["role"].lower()
     assert "sales intelligence" in by_name["Lead Research"]["role"].lower()
     assert "follow-up" in by_name["Seller"]["role"].lower()
     assert "Atlas" not in by_name
