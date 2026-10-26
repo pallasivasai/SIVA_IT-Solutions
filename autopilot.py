@@ -27,17 +27,19 @@ def main() -> None:
     team = build_team()
     outputs: dict[str, str] = {}
     outputs["market_evidence"] = build_research_context(niche + " customer complaints alternatives underserved users")
-    assignment = run_agent_step(router, store, run_id, team[0], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
+    dispatch = run_agent_step(router, store, run_id, team[0], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
+    outputs["dispatch_plan"] = dispatch["output"]
+    assignment = run_agent_step(router, store, run_id, team[1], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
     outputs["assignment"] = assignment["output"]
-    scout = run_agent_step(router, store, run_id, team[1], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
+    scout = run_agent_step(router, store, run_id, team[2], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
     outputs["research"] = scout["output"]
-    strategy = run_agent_step(router, store, run_id, team[2], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
+    strategy = run_agent_step(router, store, run_id, team[3], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
     outputs["product_strategy"] = strategy["output"]
 
     match = re.search(r"(?im)^\s*(?:product name|working name|name)\s*:\s*(.{3,70})$", outputs["product_strategy"])
     project = (match.group(1).strip(" *#") if match else "Opportunity " + datetime.now(timezone.utc).strftime("%Y%m%d"))
     project = re.sub(r"[^A-Za-z0-9 &_-]", "", project)[:60].strip() or "Opportunity " + run_id
-    outputs["implementation"] = run_agent_step(router, store, run_id, team[3], project, goal + "\nMarket: " + niche, outputs)["output"]
+    outputs["implementation"] = run_agent_step(router, store, run_id, team[4], project, goal + "\nMarket: " + niche, outputs)["output"]
 
     brief = goal + "\nMARKET: " + niche + "\nPRODUCT STRATEGY:\n" + outputs["product_strategy"] + "\nMARKET EVIDENCE:\n" + outputs["market_evidence"]
     files = build_project_files(router, project, brief, outputs["product_strategy"], outputs["implementation"])
@@ -45,7 +47,7 @@ def main() -> None:
     outputs["generated_files_context"] = "\n\n".join("### " + path + "\n" + body[:4000] for path, body in list(files.items())[:8])[:20000]
     checks = inspect_generated_files(files)
     outputs["static_qa"] = "\n".join("- " + item["status"] + ": " + item["detail"] for item in checks["checks"])
-    outputs["qa"] = run_agent_step(router, store, run_id, team[4], project, brief, outputs)["output"]
+    outputs["qa"] = run_agent_step(router, store, run_id, team[7], project, brief, outputs)["output"]
     outputs["security"] = run_agent_step(router, store, run_id, team[5], project, brief, outputs)["output"]
     outputs["sales"] = run_agent_step(router, store, run_id, team[6], project, brief, outputs)["output"]
 
