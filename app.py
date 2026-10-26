@@ -268,9 +268,9 @@ elif page == "GitHub Pull Requests":
 else:
     st.subheader("⚙️ Setup and guardrails")
     st.markdown("### Streamlit Secrets")
-    st.code('OPENAI_API_KEY = "your-key"\nOPENAI_MODEL = "gpt-4.1-mini"\nGEMINI_API_KEY = "your-key"\nGEMINI_MODEL = "gemini-2.5-flash"\nGITHUB_TOKEN = "fine-grained-token"\nGITHUB_OWNER = "pallasivasai"\nGITHUB_REPO = "SIVA_IT-Solutions"', language="toml")
+    st.code('APP_PASSWORD = "your-strong-password"\nOPENAI_API_KEY = "your-key"\nOPENAI_MODEL = "gpt-4.1-mini"\nGEMINI_API_KEY = "your-key"\nGEMINI_MODEL = "gemini-2.5-flash"\nGITHUB_TOKEN = "fine-grained-token"\nGITHUB_OWNER = "pallasivasai"\nGITHUB_REPO = "SIVA_IT-Solutions"', language="toml")
     st.write("✅ AI can create feature branches and PRs.\n\n✅ CI runs unit tests.\n\n⛔ No automatic PR merge.\n\n⛔ No production deploy or generated-code execution.")
     st.warning("Configure branch protection on main and require PR review / passing checks where supported. Never commit keys.")
     st.markdown("Deploy using [Streamlit Community Cloud](https://share.streamlit.io/) with this repository and `app.py`; configure Settings → Secrets.")
     st.markdown("### Honest limitations")
-    st.write("This is task-triggered, not an always-on workforce. Cards show recorded events. Streamlit local SQLite history may reset after restarts. Add authentication and persistent storage before handling confidential company tasks.")
+    st.write("Interactive app tasks run when you submit them. The separate GitHub Actions worker performs unattended market-to-product runs daily when Actions is enabled and provider secrets are configured. Cards show recorded events. Streamlit local SQLite history may reset after restarts. Add durable storage and stronger authentication before confidential company use.")
