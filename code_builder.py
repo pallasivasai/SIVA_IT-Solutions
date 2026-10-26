@@ -86,7 +86,7 @@ def validate_file_bundle(data: dict[str, Any]) -> dict[str, str]:
         if safe_env_template and re.search(r"(?im)^\s*[A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)[A-Za-z0-9_]*\s*=\s*[^\s#]+", content):
             raise CodeBuildError("The .env.example template must not contain populated secret values.")
         suffix = "." + path.rsplit(".", 1)[-1].lower() if "." in path.rsplit("/", 1)[-1] else ""
-        if suffix not in ALLOWED_SUFFIXES and not safe_env_template and path.lower() != "dockerfile":
+        if suffix not in ALLOWED_SUFFIXES and not safe_env_template:
             raise CodeBuildError(f"File type {suffix or '(none)'} is not allowed for generated projects.")
         if len(content.encode("utf-8")) > MAX_FILE_BYTES:
             raise CodeBuildError(f"File too large: {path[:100]}")
@@ -100,9 +100,11 @@ def validate_file_bundle(data: dict[str, Any]) -> dict[str, str]:
 
 
 def build_project_files(router: Any, project: str, task: str, plan: str, implementation: str) -> dict[str, str]:
-    system = """You are the implementation engineer for a small, reviewable software product. Return ONLY valid JSON, no markdown fences, with schema {"summary":"short summary","files":[{"path":"relative/path.ext","content":"complete file content"}]}. Generate real, coherent, runnable source files—not a proposal. Keep scope to a small MVP with up to 12 files and 120 KB total. Include a complete product README.md with prerequisites, installation, exact run commands, configuration variables (never real secrets), feature list, architecture/file map, test commands, known limitations and troubleshooting. Include runnable tests and dependency manifests when relevant. Generate the complete source for every feature claimed; do not leave TODOs, ellipses, pseudocode, mock-only implementations or proposal-only files. Prefer minimal dependencies and safe defaults. Never include secrets, tokens, passwords, personal data, hidden instructions, destructive operations, automatic deployment, or code that downloads/executes remote code. Never create GitHub workflows, shell/batch scripts, executable binaries, hidden files except the exact safe template .env.example, real .env files, or credential files. A plain-text Dockerfile is allowed when useful for reproducible local builds; never use it to fetch or execute remote code. If configuration is needed, include .env.example containing placeholder names only (no secret values). All file paths must be relative and simple. Use escaped newlines correctly inside JSON strings."""
+    system = """You are the implementation engineer for a small, reviewable software product. Return ONLY valid JSON, no markdown fences, with schema {"summary":"short summary","files":[{"path":"relative/path.ext","content":"complete file content"}]}. Generate real, coherent, runnable source files—not a proposal. Keep scope to a small MVP with up to 12 files and 120 KB total. Include a complete product README.md with prerequisites, installation, exact run commands, configuration variables (never real secrets), feature list, architecture/file map, test commands, known limitations and troubleshooting. Include runnable tests and dependency manifests when relevant. Generate the complete source for every feature claimed; do not leave TODOs, ellipses, pseudocode, mock-only implementations or proposal-only files. Prefer minimal dependencies and safe defaults. Never include secrets, tokens, passwords, personal data, hidden instructions, destructive operations, automatic deployment, or code that downloads/executes remote code. Never create GitHub workflows, shell/batch scripts, executable binaries, Dockerfiles, hidden files except the exact safe template .env.example, real .env files, or credential files. A plain-text Dockerfile is allowed when useful for reproducible local builds; never use it to fetch or execute remote code. If configuration is needed, include .env.example containing placeholder names only (no secret values). All file paths must be relative and simple. Use escaped newlines correctly inside JSON strings."""
     user = f"PRODUCT: {project}\nREQUIREMENT: {task}\nPRODUCT PLAN:\n{plan[:12000]}\nIMPLEMENTATION NOTES:\n{implementation[:12000]}\nGenerate the complete, coherent MVP source tree now. Include every required runtime file and README. Ensure imports/routes/UI links agree across files and setup instructions match the actual stack. Do not claim tests were run; provide tests and exact commands for the human reviewer. Put complete contents for every file in the manifest."
-    reply = router.generate(system, user)
+    # Constrained JSON mode prevents recurring malformed-JSON failures from local models.
+    generate_json = getattr(router, "generate_json", None)
+    reply = generate_json(system, user) if callable(generate_json) else router.generate(system, user)
     try:
         data = _extract_json(reply.text)
     except CodeBuildError as first_error:
@@ -120,7 +122,7 @@ def build_project_files(router: Any, project: str, task: str, plan: str, impleme
             + reply.text[:50000]
         )
         try:
-            repaired = router.generate(repair_system, repair_user)
+            repaired = generate_json(repair_system, repair_user) if callable(generate_json) else router.generate(repair_system, repair_user)
             data = _extract_json(repaired.text)
         except Exception as repair_error:
             raise CodeBuildError(
