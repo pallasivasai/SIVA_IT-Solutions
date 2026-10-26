@@ -12,6 +12,7 @@ from ai_providers import ProviderError, ProviderRouter
 from github_service import GitHubError, GitHubService
 from project_checks import inspect_generated_files
 from market_research import build_research_context
+from pipeline_gates import evaluate_market_gate, evaluate_release_gate
 from storage import EventStore
 
 st.set_page_config(page_title="SIVA IT Solutions · AI Office", page_icon="🏢", layout="wide")
@@ -70,10 +71,10 @@ with st.sidebar:
     st.caption("AI Company Control Center")
     page = st.radio("Workspace", ["Office Floor", "Task Board", "AI Project Room", "GitHub Pull Requests", "Settings & Setup"])
     st.divider()
-    st.markdown("**System map**")
-    st.write("🧠 OpenAI → Gemini fallback")
-    st.write("🧭 Plan → 💻 Build proposal")
-    st.write("🧪 QA → 🛡️ Security")
+    st.markdown("**Agent hand-offs**")
+    st.write("🔎 Research → 💡 Product plan")
+    st.write("💻 Dev → 🧪 QA → 🛡️ Security")
+    st.write("🧭 Leads → 📈 Seller follow-up")
     st.write("🔀 Human-reviewed GitHub PR")
     st.caption("No API keys belong in source code.")
 
@@ -104,7 +105,7 @@ if page == "Office Floor":
     latest: dict[str, dict[str, Any]] = {}
     def canonical_agent_name(raw_name: str) -> str:
         raw = raw_name.strip()
-        aliases = {"Dev · Code Builder": "Dev", "GitHub Integrator": "Atlas"}
+        aliases = {"Dev · Code Builder": "Dev", "GitHub Integrator": "System"}
         if raw in aliases:
             return aliases[raw]
         return raw.split(" · ", 1)[0].strip()
@@ -120,16 +121,16 @@ if page == "Office Floor":
     for agent in team:
         ev = latest.get(agent["name"], {})
         status, css_status = labels.get(ev.get("status", "idle"), ("IDLE", "idle"))
-        task = html.escape(str(ev.get("task", "Waiting for assignment"))[:105])
+        task = html.escape(str(ev.get("task", "Waiting for workflow hand-off"))[:105])
         name = html.escape(str(agent["name"]))
         role = html.escape(str(agent["role"].split("·")[0].strip()))
         emoji = html.escape(str(agent.get("emoji", "🤖")))
         stations.append('<div class="agent-station"><div class="agent-sprite">' + emoji + '</div><div class="agent-desk"></div><div class="agent-name">' + name + '</div><div class="agent-role">' + role + '</div><div class="agent-status ' + css_status + '">' + status + '</div><div style="margin-top:5px;text-align:center;color:#3c5b5b;font-size:.65rem">' + task + '</div></div>')
-    office_html = '<div class="office-shell"><div class="office-top"><span>▦ SIVA IT SOLUTIONS · FLOOR 01</span><span>8 AGENT WORKSTATIONS · AUTO-REFRESH 5s</span></div><div class="office-floor">' + "".join(stations) + '</div><div class="office-bottom"><span>● VIEW OF RECORDED EVENTS</span><span>Human approval required · No auto-merge/deploy</span></div></div>'
+    office_html = '<div class="office-shell"><div class="office-top"><span>▦ SIVA IT SOLUTIONS · FLOOR 01</span><span>7 SPECIALIST WORKSTATIONS · AUTO-REFRESH 5s</span></div><div class="office-floor">' + "".join(stations) + '</div><div class="office-bottom"><span>● VIEW OF RECORDED EVENTS</span><span>Human approval required · No auto-merge/deploy</span></div></div>'
     st.markdown(office_html, unsafe_allow_html=True)
     st.divider()
     st.subheader("🧭 Workflow lane")
-    stages = [("1 · Atlas — Dispatch", "Creates the coordination plan, owners, dependencies and completion conditions."), ("2 · Mira — Task assignment", "Turns the goal into ordered tasks with priorities and acceptance criteria."), ("3 · Scout — Market research", "Collects public evidence and identifies customer/industry gaps."), ("4 · Nova — Product strategy", "Turns the strongest opportunity into a scoped MVP."), ("5 · Dev — Source generation", "Creates reviewable product source files."), ("6 · Tara + Shield — QA and security", "Reviews quality, edge cases, secrets and release risks."), ("7 · Seller — Go-to-market", "Prepares positioning, pricing hypotheses and launch assets."), ("8 · GitHub Pull Request", "Packages product files for human review; no automatic merge or deployment.") ]
+    stages = [("1 · Scout — Market research", "Finds evidence-backed industry gaps and competitors before any product plan."), ("2 · Nova — Product plan", "Defines the MVP, target users and acceptance criteria from research."), ("3 · Dev — Build", "Creates the actual product source and fixes reviewer findings."), ("4 · Tara + Shield — QA/security", "Write and review tests, identify defects and assess security."), ("5 · Lead Research — Buyer leads", "Finds relevant prospects with verifiable public sources after release readiness."), ("6 · Seller — Outreach/follow-up", "Creates prospect-specific messages and a follow-up schedule; sending requires approval."), ("7 · GitHub Pull Request", "Packages eligible product files for human review; no automatic merge or deployment.") ]
     for title, desc in stages:
         st.markdown('<div class="taskline"><b>' + title + '</b><br><span class="smallmuted">' + desc + '</span></div>', unsafe_allow_html=True)
     with st.expander("View latest agent activity"):
@@ -158,11 +159,11 @@ elif page == "Task Board":
         st.divider()
 
 elif page == "AI Project Room":
-    st.subheader("🧩 Assign a task to the AI team")
-    st.write("Atlas dispatches → Mira sequences ownership → Scout researches → Nova scopes the MVP → Dev generates the actual source tree → Tara checks quality → Shield reviews security → Seller prepares optional go-to-market material. The PR must contain the product source and a product-specific README; Seller is not the code builder. Generated code is not executed by this dashboard.")
+    st.subheader("🧩 Give the company a product goal")
+    st.write("Give one product goal. The workflow engine automatically routes it through fixed-scope agents: Scout researches the industry gap → Nova defines the product → Dev builds it → Tara tests it → Shield reviews security → Dev fixes findings → QA/Security re-review → Lead Research finds sourced prospects → Seller prepares tailored outreach and follow-up. You do not assign individual tasks to agents. Sending outreach requires your approval and an authorized channel.")
     with st.form("task_form"):
         project = st.text_input("Project name", value=st.session_state.selected_project)
-        task = st.text_area("Requirement", height=170, placeholder="Describe the feature, constraints, acceptance criteria and what must not change.")
+        task = st.text_area("Requirement", height=170, placeholder="Example: Find an underserved problem for small businesses in India, build a secure MVP, test it, then research suitable buyers and prepare follow-up messages.")
         base_branch = st.text_input("Target base branch for PR (optional)", "main")
         submitted = st.form_submit_button("Start workflow", type="primary", disabled=not PASSWORD_CONFIGURED)
     if submitted:
@@ -177,21 +178,23 @@ elif page == "AI Project Room":
             outputs: dict[str, Any] = {}
             progress = st.status("Starting task workflow…", expanded=True)
             try:
-                dispatch = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
-                outputs["dispatch_plan"] = dispatch["output"]
-                progress.write("Atlas created the team dispatch plan")
-                assignment = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
-                outputs["assignment"] = assignment["output"]
-                progress.write("Mira refined task ownership")
-                progress.write("Scout is collecting public market evidence…")
+                progress.write("Scout is researching the industry gap and competitors…")
                 outputs["market_evidence"] = build_research_context(task)
-                scout = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
+                market_gate = evaluate_market_gate(outputs["market_evidence"])
+                outputs["market_gate"] = market_gate
+                store.add_event(run_id, "Research Gate", task, "market_gate_checked",
+                                "completed" if market_gate["passed"] else "failed",
+                                summary=f"{market_gate['source_count']} distinct source URLs; passed={market_gate['passed']}")
+                if not market_gate["passed"]:
+                    raise RuntimeError(market_gate["reason"])
+                progress.write(f"Research gate passed with {market_gate['source_count']} distinct source URLs")
+                scout = run_agent_step(router, store, run_id, team[0], current_project, task, outputs)
                 outputs["research"] = scout["output"]
                 progress.write("Scout completed gap research")
-                strategy = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
+                strategy = run_agent_step(router, store, run_id, team[1], current_project, task, outputs)
                 outputs["product_strategy"] = strategy["output"]
                 progress.write("Nova selected an MVP direction")
-                implementation = run_agent_step(router, store, run_id, team[4], current_project, task, outputs)
+                implementation = run_agent_step(router, store, run_id, team[2], current_project, task, outputs)
                 outputs["implementation"] = implementation["output"]
                 progress.write("Dev prepared implementation notes")
                 generated_files: dict[str, str] = {}
@@ -210,10 +213,10 @@ elif page == "AI Project Room":
                     outputs["code_build_error"] = str(exc)
                     store.add_event(run_id, "Dev · Code Builder", task, "code_generation_failed", "failed", summary=str(exc))
                     progress.write(f"Code generation needs retry: {exc}")
-                qa = run_agent_step(router, store, run_id, team[5], current_project, task, outputs)
+                qa = run_agent_step(router, store, run_id, team[3], current_project, task, outputs)
                 outputs["qa"] = qa["output"]
                 progress.write("Tara completed the QA report")
-                security = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
+                security = run_agent_step(router, store, run_id, team[4], current_project, task, outputs)
                 outputs["security"] = security["output"]
                 progress.write("Shield completed the security review")
                 # One bounded feedback loop: Dev receives the actual QA/security findings,
@@ -229,7 +232,7 @@ elif page == "AI Project Room":
                         "\n\nSTATIC CHECK RESULTS:\n" + outputs.get("static_qa", "")
                     )
                     try:
-                        remediation = run_agent_step(router, store, run_id, team[4], current_project, review_feedback, outputs)
+                        remediation = run_agent_step(router, store, run_id, team[2], current_project, review_feedback, outputs)
                         outputs["remediation"] = remediation["output"]
                         revised_brief = (
                             task + "\n\nAPPROVED PRODUCT STRATEGY:\n" + outputs.get("product_strategy", "") +
@@ -255,21 +258,47 @@ elif page == "AI Project Room":
                         store.add_event(run_id, "Dev · Remediation", task, "code_remediated", "completed",
                                         summary=f"Regenerated {len(generated_files)} source files from QA/security feedback")
                         progress.write("Revised source generated; Tara and Shield are re-reviewing it…")
-                        outputs["qa"] = run_agent_step(router, store, run_id, team[5], current_project,
+                        outputs["qa"] = run_agent_step(router, store, run_id, team[3], current_project,
                                                        "RE-REVIEW revised source. Verify previous findings are fixed and identify remaining defects. " + task,
                                                        outputs)["output"]
-                        outputs["security"] = run_agent_step(router, store, run_id, team[6], current_project,
+                        outputs["security"] = run_agent_step(router, store, run_id, team[4], current_project,
                                                              "RE-REVIEW revised source. Verify previous security findings are fixed and identify residual risks. " + task,
                                                              outputs)["output"]
                     except CodeBuildError as exc:
                         outputs["remediation_error"] = str(exc)
                         store.add_event(run_id, "Dev · Remediation", task, "remediation_failed", "failed", summary=str(exc))
                         progress.warning(f"Remediation pass did not produce revised source: {exc}")
-                sales = run_agent_step(router, store, run_id, team[7], current_project, task, outputs)
-                outputs["sales"] = sales["output"]
-                progress.write("Seller prepared optional go-to-market assets (not product source code)")
+                final_static_checks = inspect_generated_files(generated_files) if generated_files else {"passed": False, "failures": 1, "warnings": 0, "checks": []}
+                outputs["final_static_checks"] = final_static_checks
+                release_gate = evaluate_release_gate(
+                    generated_files, final_static_checks, outputs.get("qa", ""), outputs.get("security", "")
+                )
+                outputs["release_gate"] = release_gate
+                store.add_event(run_id, "Final Release Auditor", task, "release_gate_checked",
+                                "completed" if release_gate["passed"] else "blocked",
+                                summary="; ".join(release_gate["reasons"]) if release_gate["reasons"] else "QA, security and deterministic checks passed")
+                if release_gate["passed"]:
+                    progress.write("Release gate passed. Lead Research is finding sourced, relevant prospects…")
+                    outputs["lead_evidence"] = build_research_context(
+                        "businesses and companies likely to buy " + current_project + " in India and relevant target markets public company websites contact page"
+                    )
+                    leads = run_agent_step(router, store, run_id, team[5], current_project, task, outputs)
+                    outputs["leads"] = leads["output"]
+                    progress.write("Lead Research handed sourced prospect findings to Seller.")
+                    sales = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
+                    outputs["sales"] = sales["output"]
+                    progress.write("Seller prepared tailored outreach and a follow-up sequence; no messages were sent.")
+                else:
+                    outputs["sales"] = "BLOCKED: Seller is not allowed to proceed until QA, security, and deterministic source checks explicitly pass.\n" + "\n".join(release_gate["reasons"])
+                    store.add_event(run_id, "Seller", task, "sales_blocked_by_release_gate", "blocked",
+                                    summary="; ".join(release_gate["reasons"]))
+                    progress.warning("Release gate blocked the product. Seller and GitHub PR actions remain disabled until blockers are fixed.")
                 st.session_state.last_run = {"run_id":run_id,"project":current_project,"task":task,"outputs":outputs,"files":generated_files,"base_branch":base_branch}
-                progress.update(label="Workflow completed", state="complete", expanded=False)
+                progress.update(
+                    label="Workflow completed" if release_gate["passed"] else "Workflow blocked by release gate",
+                    state="complete" if release_gate["passed"] else "error",
+                    expanded=not release_gate["passed"],
+                )
             except ProviderError as exc:
                 store.add_event(run_id, "System", task, "workflow_failed", "failed", summary=str(exc))
                 progress.update(label="Workflow stopped", state="error", expanded=True)
@@ -282,7 +311,13 @@ elif page == "AI Project Room":
     if result:
         st.markdown(f"### Latest run · {result['project']}")
         st.caption(f"Run ID: {result['run_id']}")
-        for label, key in [("🧭 Atlas dispatch plan","dispatch_plan"),("🗂️ Task assignments","assignment"),("🔎 Industry gap research","research"),("💡 Product strategy","product_strategy"),("💻 Implementation proposal","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security"),("📈 Sales and go-to-market plan","sales")]:
+        if result.get("outputs", {}).get("market_gate"):
+            with st.expander("🔎 Research gate evidence", expanded=False):
+                st.json(result["outputs"]["market_gate"])
+        if result.get("outputs", {}).get("release_gate"):
+            with st.expander("🚦 Final release gate", expanded=True):
+                st.json(result["outputs"]["release_gate"])
+        for label, key in [("🔎 Industry gap research","research"),("💡 Product plan","product_strategy"),("💻 Developer hand-off","implementation"),("🧪 QA report","qa"),("🛡️ Security review","security"),("🧭 Sourced sales leads","leads"),("📈 Seller outreach + follow-up plan","sales")]:
             with st.expander(label, expanded=(key == "plan")):
                 st.markdown(result["outputs"].get(key, "No report available."))
         if result.get("code_build_error"):
@@ -296,7 +331,12 @@ elif page == "AI Project Room":
         else:
             st.info("No source files are available yet. Re-run with a smaller, specific MVP requirement to generate a product.")
         st.warning("Generated files are reviewed as a GitHub PR. This app does not execute generated code, merge PRs, or deploy products automatically.")
-        if st.button("Create feature branch + GitHub Pull Request", type="primary", key=f"pr_{result['run_id']}", disabled=not PASSWORD_CONFIGURED or not generated_files):
+        release_ready = bool(result.get("outputs", {}).get("release_gate", {}).get("passed"))
+        if not release_ready:
+            st.error("Release blocked: QA, security, and deterministic checks must all pass before a product PR can be created.")
+            for reason in result.get("outputs", {}).get("release_gate", {}).get("reasons", []):
+                st.write("• " + reason)
+        if st.button("Create feature branch + GitHub Pull Request", type="primary", key=f"pr_{result['run_id']}", disabled=not PASSWORD_CONFIGURED or not generated_files or not release_ready):
             try:
                 gh = GitHubService()
                 bundle = gh.generate_file_bundle(result)

@@ -2,7 +2,7 @@ name: Python checks
 
 on:
   push:
-    branches: [main, "feat/**", "ai-proposal/**"]
+    branches: [main, "feat/**", "feature/**", "ai-proposal/**"]
   pull_request:
     branches: [main]
 
@@ -23,6 +23,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Compile application and workers
-        run: python -m compileall -q app.py agents.py ai_providers.py code_builder.py github_service.py market_research.py project_checks.py storage.py autopilot.py orchestration.py
+        run: python -m compileall -q app.py agents.py ai_providers.py code_builder.py github_service.py market_research.py project_checks.py pipeline_gates.py storage.py autopilot.py orchestration.py
       - name: Run unit tests
         run: pytest -q
