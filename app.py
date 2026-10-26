@@ -216,6 +216,55 @@ elif page == "AI Project Room":
                 security = run_agent_step(router, store, run_id, team[6], current_project, task, outputs)
                 outputs["security"] = security["output"]
                 progress.write("Shield completed the security review")
+                # One bounded feedback loop: Dev receives the actual QA/security findings,
+                # regenerates the source tree, and both reviewers inspect the revised files.
+                if generated_files:
+                    progress.write("Dev is receiving Tara/Shield findings for one remediation pass…")
+                    review_feedback = (
+                        "REQUIRED REMEDIATION PASS. Review the existing source files and fix concrete findings below. "
+                        "Preserve unrelated functionality. Return file-level implementation notes; do not claim tests were run.\n\n"
+                        "CURRENT SOURCE FILES:\n" + outputs.get("generated_files_context", "")[:18000] +
+                        "\n\nTARA QA FINDINGS:\n" + outputs.get("qa", "")[:7000] +
+                        "\n\nSHIELD SECURITY FINDINGS:\n" + outputs.get("security", "")[:7000] +
+                        "\n\nSTATIC CHECK RESULTS:\n" + outputs.get("static_qa", "")
+                    )
+                    try:
+                        remediation = run_agent_step(router, store, run_id, team[4], current_project, review_feedback, outputs)
+                        outputs["remediation"] = remediation["output"]
+                        revised_brief = (
+                            task + "\n\nAPPROVED PRODUCT STRATEGY:\n" + outputs.get("product_strategy", "") +
+                            "\n\nMARKET EVIDENCE:\n" + outputs.get("market_evidence", "") +
+                            "\n\nQA FINDINGS TO FIX:\n" + outputs.get("qa", "") +
+                            "\n\nSECURITY FINDINGS TO FIX:\n" + outputs.get("security", "") +
+                            "\n\nDEV REMEDIATION NOTES:\n" + outputs["remediation"]
+                        )
+                        revised_files = build_project_files(
+                            router, current_project, revised_brief,
+                            outputs.get("product_strategy", ""), outputs["remediation"]
+                        )
+                        revised_checks = inspect_generated_files(revised_files)
+                        generated_files = revised_files
+                        outputs["generated_files_summary"] = "\n".join(f"- {path}" for path in generated_files)
+                        outputs["generated_files_context"] = "\n\n".join(
+                            f"### {path}\n{body[:6000]}" for path, body in list(generated_files.items())[:8]
+                        )[:24000]
+                        outputs["static_qa"] = "\n".join(
+                            "- " + item["status"] + ": " + item["detail"] for item in revised_checks["checks"]
+                        )
+                        outputs["generated_files_context"] += "\n\n## Deterministic non-executing checks\n" + outputs["static_qa"]
+                        store.add_event(run_id, "Dev · Remediation", task, "code_remediated", "completed",
+                                        summary=f"Regenerated {len(generated_files)} source files from QA/security feedback")
+                        progress.write("Revised source generated; Tara and Shield are re-reviewing it…")
+                        outputs["qa"] = run_agent_step(router, store, run_id, team[5], current_project,
+                                                       "RE-REVIEW revised source. Verify previous findings are fixed and identify remaining defects. " + task,
+                                                       outputs)["output"]
+                        outputs["security"] = run_agent_step(router, store, run_id, team[6], current_project,
+                                                             "RE-REVIEW revised source. Verify previous security findings are fixed and identify residual risks. " + task,
+                                                             outputs)["output"]
+                    except CodeBuildError as exc:
+                        outputs["remediation_error"] = str(exc)
+                        store.add_event(run_id, "Dev · Remediation", task, "remediation_failed", "failed", summary=str(exc))
+                        progress.warning(f"Remediation pass did not produce revised source: {exc}")
                 sales = run_agent_step(router, store, run_id, team[7], current_project, task, outputs)
                 outputs["sales"] = sales["output"]
                 progress.write("Seller prepared optional go-to-market assets (not product source code)")
