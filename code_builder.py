@@ -32,7 +32,7 @@ def _extract_json(text: str) -> dict[str, Any]:
             if in_string:
                 if escaped:
                     escaped = False
-                elif char == "\\\\":
+                elif char == "\\":
                     escaped = True
                 elif char == '"':
                     in_string = False
