@@ -8,7 +8,7 @@ from agents import build_team, run_agent_step
 from ai_providers import ProviderRouter
 from code_builder import build_project_files
 from github_service import GitHubService
-from market_research import build_research_context
+from market_research import build_research_context, collect_market_research
 from project_checks import inspect_generated_files
 from pipeline_gates import evaluate_market_gate, evaluate_release_gate
 from storage import EventStore
@@ -27,8 +27,11 @@ def main() -> None:
     router = ProviderRouter()
     team = build_team()
     outputs: dict[str, str] = {}
-    outputs["market_evidence"] = build_research_context(niche + " customer complaints alternatives underserved users")
-    market_gate = evaluate_market_gate(outputs["market_evidence"])
+    research_pack = collect_market_research(niche + " customer complaints alternatives underserved users")
+    outputs["market_evidence"] = research_pack["context"]
+    outputs["market_sources"] = research_pack["results"]
+    outputs["market_search_diagnostics"] = research_pack["diagnostics"]
+    market_gate = evaluate_market_gate("\n".join(research_pack["source_urls"]))
     outputs["market_gate"] = market_gate
     store.add_event(run_id, "Research Gate", goal, "market_gate_checked",
                     "completed" if market_gate["passed"] else "failed",
@@ -37,7 +40,13 @@ def main() -> None:
         raise RuntimeError(market_gate["reason"])
     scout = run_agent_step(router, store, run_id, team[0], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
     outputs["research"] = scout["output"]
-    strategy = run_agent_step(router, store, run_id, team[1], "Autonomous market discovery", goal + "\nMarket: " + niche, outputs)
+    strategy = run_agent_step(
+        router, store, run_id, team[1], "Autonomous market discovery",
+        "PROJECT MANAGER HAND-OFF: review Scout's entire research report and source evidence, select the best evidenced gap, "
+        "write MVP plan and acceptance criteria, then split tasks by owner/input/output/dependencies/done criteria for Dev, Tara, "
+        "Shield, GitHub Integrator, Lead Research and Seller. Do not code.\n" + goal + "\nMarket: " + niche,
+        outputs,
+    )
     outputs["product_strategy"] = strategy["output"]
 
     match = re.search(r"(?im)^\s*(?:product name|working name|name)\s*:\s*(.{3,70})$", outputs["product_strategy"])
