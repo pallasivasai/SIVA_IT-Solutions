@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import time
 from ai_providers import ProviderRouter
 
 TEAM = [
@@ -49,11 +50,22 @@ def assigned_task_for(agent: dict[str, str], overall_goal: str) -> str:
 def run_agent_step(router: ProviderRouter, store: Any, run_id: str, agent: dict[str, str], project: str, task: str, context: dict[str, Any]) -> dict[str, str]:
     assigned_task = assigned_task_for(agent, task)
     store.add_event(run_id, agent["name"], assigned_task, "agent_started", "running", summary=f"{agent['role']} started")
-    try:
-        system, user = build_prompts(agent, project, assigned_task, context)
-        reply = router.generate(system, user)
-        store.add_event(run_id, agent["name"], assigned_task, "agent_completed", "completed", summary=f"{agent['role']} completed the hand-off", provider=reply.provider, model=reply.model)
-        return {"output": reply.text, "provider": reply.provider, "model": reply.model}
-    except Exception as exc:
-        store.add_event(run_id, agent["name"], assigned_task, "agent_failed", "failed", summary=f"{type(exc).__name__}: {exc}")
-        raise
+    system, user = build_prompts(agent, project, assigned_task, context)
+    last_error: Exception | None = None
+    # Retry only transient provider failures; don't repeatedly retry invalid credentials or bad requests.
+    for attempt in range(1, 4):
+        try:
+            reply = router.generate(system, user)
+            store.add_event(run_id, agent["name"], assigned_task, "agent_completed", "completed", summary=f"{agent['role']} completed the hand-off (attempt {attempt})", provider=reply.provider, model=reply.model)
+            return {"output": reply.text, "provider": reply.provider, "model": reply.model}
+        except Exception as exc:
+            last_error = exc
+            message = f"{type(exc).__name__}: {exc}".lower()
+            transient = any(token in message for token in ("429", "rate limit", "timeout", "timed out", "temporarily unavailable", "service unavailable", "503", "resource exhausted", "connection reset", "internal server error"))
+            if not transient or attempt == 3:
+                break
+            store.add_event(run_id, agent["name"], assigned_task, "agent_retry", "running", summary=f"Transient provider error; retry {attempt + 1}/3: {type(exc).__name__}: {exc}")
+            time.sleep(attempt * 2)
+    assert last_error is not None
+    store.add_event(run_id, agent["name"], assigned_task, "agent_failed", "failed", summary=f"{type(last_error).__name__}: {last_error}")
+    raise last_error
